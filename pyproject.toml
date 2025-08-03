@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "py-slurm"
+name = "slurmster"
 version = "0.1.0"
 description = "Minimal Slurm experiment runner with persistent SSH, YAML configs, and log streaming"
 readme = "README.md"
