@@ -15,4 +15,3 @@ dependencies = [
 
 [project.scripts]
 slurmster = "slurmster.cli:main"
-slurmster = "slurmster.cli:main"
