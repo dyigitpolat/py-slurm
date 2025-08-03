@@ -1,0 +1,32 @@
+remote:
+  base_dir: ~/experiments
+  venv_dir: venv
+  setup:
+    create_venv: true
+    requirements: example/requirements.txt
+
+files:
+  push:
+    - train.py
+    - requirements.txt
+  # fetch:                             # optional; if omitted, fetch entire run dir
+  #   - "{exp_name}_model.pth"
+  #   - "{exp_name}_log.txt"
+
+slurm:
+  directives: |
+    #SBATCH --job-name={exp_name}
+    #SBATCH --partition=gpu
+    #SBATCH --time=00:10:00
+    #SBATCH --cpus-per-gpu=4
+    #SBATCH --nodes=1
+    #SBATCH --gres=gpu:1
+    #SBATCH --mem=16G
+
+run:
+  command: |
+    source venv/bin/activate
+    python example/train.py --lr {lr} --epochs {epochs} --save_model {exp_name}_model.pth --log_file {exp_name}_log.txt
+  grid:
+    lr: [0.1, 0.01, 0.001]
+    epochs: [1, 2, 5, 10]
