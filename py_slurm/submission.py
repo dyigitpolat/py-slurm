@@ -164,14 +164,14 @@ def submit_all(
             for line in conn.stream_tail(posixpath.join(run_dir, "stdout.log"), from_start=False, lines=50):
                 print(line, flush=True)
         except KeyboardInterrupt:
-            print("stopped monitoring (Ctrl-C). You can re-attach later with 'py-slurm monitor --exp ...'")
+            print("stopped monitoring (Ctrl-C). You can re-attach later with 'slurmster monitor --exp ...'")
 
     return True
 
 
 def _write_temp(content):
     import tempfile, uuid
-    path = os.path.join(tempfile.gettempdir(), f"py_slurm_{uuid.uuid4().hex}.sh")
+    path = os.path.join(tempfile.gettempdir(), f"slurmster_{uuid.uuid4().hex}.sh")
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
     return path

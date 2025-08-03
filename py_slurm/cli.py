@@ -10,7 +10,7 @@ def _password_from_env(env):
     return os.environ.get(env)
 
 def main():
-    parser = argparse.ArgumentParser(prog="py-slurm", description="Minimal Slurm experiment runner in Python")
+    parser = argparse.ArgumentParser(prog="slurmster", description="Minimal Slurm experiment runner in Python")
     parser.add_argument("--config", required=True, help="Path to YAML config")
     parser.add_argument("--user", required=True, help="SSH username")
     parser.add_argument("--host", required=True, help="SSH host")
@@ -44,9 +44,9 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config(args.config)
-    # Always place .py_slurm workspace next to the YAML config file
+    # Always place .slurmster workspace next to the YAML config file
     _cfg_dir = os.path.dirname(os.path.abspath(args.config))
-    cfg["_local_root"] = os.path.join(_cfg_dir, ".py_slurm")
+    cfg["_local_root"] = os.path.join(_cfg_dir, ".slurmster")
 
     # Prepare push-file mapping (local absolute path, remote relative path)
     push_entries = []

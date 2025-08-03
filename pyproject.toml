@@ -14,4 +14,5 @@ dependencies = [
 ]
 
 [project.scripts]
+slurmster = "slurmster.cli:main"
 py-slurm = "py_slurm.cli:main"

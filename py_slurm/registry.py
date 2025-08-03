@@ -14,8 +14,8 @@ class Registry:
         user, host, remote_base_dir
             Identify the *remote* experiment location – together these make the key.
         local_root : str or None, optional
-            Directory in which the hidden ``.py_slurm`` workspace should live.
-            If *None* (default), we fall back to ``~/.py_slurm`` (previous
+            Directory in which the hidden ``.slurmster`` workspace should live.
+            If *None* (default), we fall back to ``~/.slurmster`` (previous
             behaviour).  Passing the directory that contains the YAML config file
             lets each experiment set live next to its configuration.
         """
@@ -24,7 +24,7 @@ class Registry:
         safe_base = _sanitize(base_key)
 
         if local_root is None:
-            local_root = os.path.expanduser("~/.py_slurm")
+            local_root = os.path.expanduser("~/.slurmster")
 
         self.root = os.path.join(os.path.abspath(local_root), safe_base)
         os.makedirs(self.root, exist_ok=True)

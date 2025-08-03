@@ -3,8 +3,8 @@ import re
 import logging
 import time
 from typing import List, Dict, Any
-from py_slurm.connection import SSHConnection
-from py_slurm.config import Config
+from .connection import SSHConnection
+from .config import Config
 
 logger = logging.getLogger(__name__)
 
