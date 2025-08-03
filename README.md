@@ -25,57 +25,54 @@ Or use a virtual environment first.
 ## Quick start
 
 1) Prepare a config (see `example/config.yaml`).  
-2) Submit jobs:
+2) Submit jobs — the tool automatically uploads **and schedules** `env_setup.sh` as a lightweight Slurm job (idempotent) so preparation runs on a compute node:
 
 ```bash
-py-slurm submit --config example/config.yaml --user <remote_user> --host <remote_host> --password-env SLURM_PASS  # optional; otherwise you'll be prompted
+py-slurm --config config.yaml --user <remote_user> --host <remote_host> --password-env SLURM_PASS submit  # optional; otherwise you'll be prompted
 ```
 
 3) Stream logs (auto-starts on submit unless `--no-monitor` is passed), or re-attach later:
 
 ```bash
-py-slurm monitor --config example/config.yaml --user <remote_user> --host <remote_host> --exp exp_lr_0.01_epochs_5  # or --job <jobid>
+py-slurm --config config.yaml --user <remote_user> --host <remote_host> monitor --exp exp_lr_0.01_epochs_5  # or --job <jobid>
 ```
 
 4) Check status of **non-fetched** runs:
 
 ```bash
-py-slurm status --config example/config.yaml --user <u> --host <h>
+py-slurm --config config.yaml --user <u> --host <h> status
 ```
 
 5) Fetch finished runs (downloads each run dir into your local workspace):
 
 ```bash
-py-slurm fetch --config example/config.yaml --user <u> --host <h>
+py-slurm --config config.yaml --user <u> --host <h> fetch
 ```
 
 6) Cancel a job:
 
 ```bash
-py-slurm cancel --config example/config.yaml --user <u> --host <h> --exp exp_lr_0.01_epochs_5
+py-slurm --config example/config.yaml --user <u> --host <h> cancel --exp exp_lr_0.01_epochs_5
 # or: --job 1234567
 ```
 
 ## YAML schema
 
+# YAML skeleton
 ```yaml
 remote:
   base_dir: ~/experiments            # remote working root
-  venv_dir: venv                     # created under base_dir
-  setup:
-    create_venv: true
-    requirements: example/requirements.txt  # local path to upload & install (optional)
 
 files:
   push:
     - example/train.py               # any code/data files you need on remote
   fetch:
-    - "{exp_name}_model.pth"         # optional; if omitted we fetch the entire run dir
-    - "{exp_name}_log.txt"
+    - "model.pth"                   # optional; if omitted we fetch the entire run dir
+    - "log.txt"
 
 slurm:
   directives: |                      # SBATCH lines; placeholders allowed
-    #SBATCH --job-name={exp_name}
+    #SBATCH --job-name={base_dir}
     #SBATCH --partition=gpu
     #SBATCH --time=00:10:00
     #SBATCH --cpus-per-gpu=40
@@ -86,7 +83,7 @@ slurm:
 run:
   command: |                         # your run command; placeholders allowed
     source venv/bin/activate
-    python example/train.py --lr {lr} --epochs {epochs}           --save_model {exp_name}_model.pth --log_file {exp_name}_log.txt
+    python example/train.py --lr {lr} --epochs {epochs}           --save_model "{run_dir}/model.pth" --log_file "{run_dir}/log.txt"
 
   # ONE of the following:
   grid:
@@ -99,16 +96,16 @@ run:
 
 ### Placeholders
 
-- `{exp_name}`: generated like `exp_lr_0.01_epochs_5`
+- `{base_dir}`: resolved remote base directory (e.g. `/home/you/experiments`)
 - Any run parameter placeholder, e.g. `{lr}`, `{epochs}`
 - `{remote_dir}`: the configured `remote.base_dir`
 - `{run_dir}`: the per-run directory (under `remote.base_dir/runs/{exp_name}`)
 
 ## Local workspace
 
-Under `~/.py_slurm/<user>@<host>/<sanitized-remote-base>`, we store:
+Under the **`.py_slurm` directory next to your `config.yaml`** (`<config-dir>/.py_slurm/<user>@<host>/<sanitized-remote-base>`), we store:
 - `runs.json` — run registry (job id, exp name, fetched flag, etc.)
-- `results/<exp_name>/...` — fetched run directories
+- `results/<exp_name>_<job_id>/...` — fetched run directories
 
 ## License
 

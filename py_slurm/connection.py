@@ -56,8 +56,10 @@ class SSHConnection:
             raise RuntimeError("SSHConnection not connected")
         cmd = f'bash -lc "{command.replace('"', r'\"')}"'
         stdin, stdout, stderr = self._client.exec_command(cmd, get_pty=get_pty)
+        # Read complete output (but do not automatically echo it).
         out = stdout.read().decode("utf-8", "ignore")
         err = stderr.read().decode("utf-8", "ignore")
+
         rc = stdout.channel.recv_exit_status()
         return rc, out, err
 

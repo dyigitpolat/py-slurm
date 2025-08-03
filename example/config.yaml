@@ -1,21 +1,17 @@
 remote:
-  base_dir: ~/experiments
-  venv_dir: venv
-  setup:
-    create_venv: true
-    requirements: example/requirements.txt
+  base_dir: mnist_test
 
 files:
   push:
     - train.py
     - requirements.txt
-  # fetch:                             # optional; if omitted, fetch entire run dir
-  #   - "{exp_name}_model.pth"
-  #   - "{exp_name}_log.txt"
+  fetch:                             # optional; if omitted, fetch entire run dir
+    - "{run_dir}/model.pth"
+    - "{run_dir}/log.txt"
 
 slurm:
   directives: |
-    #SBATCH --job-name={exp_name}
+    #SBATCH --job-name={base_dir}
     #SBATCH --partition=gpu
     #SBATCH --time=00:10:00
     #SBATCH --cpus-per-gpu=4
@@ -26,7 +22,12 @@ slurm:
 run:
   command: |
     source venv/bin/activate
-    python example/train.py --lr {lr} --epochs {epochs} --save_model {exp_name}_model.pth --log_file {exp_name}_log.txt
+    python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth" --log_file "{run_dir}/log.txt"
   grid:
-    lr: [0.1, 0.01, 0.001]
-    epochs: [1, 2, 5, 10]
+    lr: [0.01, 0.001]
+    epochs: [2, 5]
+
+  # OR YOU CAN DO:
+  # experiments:
+  #   - { lr: 0.1, epochs: 1 }
+  #   - { lr: 0.001, epochs: 10 }

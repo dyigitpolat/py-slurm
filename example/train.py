@@ -60,7 +60,7 @@ def main():
                 running_loss += loss.item()
                 if (i+1) % 100 == 0:
                     line = f"epoch {epoch+1}/{args.epochs} | batch {i+1} | loss {running_loss/100:.4f}\n"
-                    print(line, end="")
+                    print(line, end="", flush=True)
                     logf.write(line)
                     running_loss = 0.0
 
@@ -75,7 +75,7 @@ def main():
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
         acc_line = f"test accuracy: {100*correct/total:.2f}%\n"
-        print(acc_line, end="")
+        print(line, end="", flush=True)
         logf.write(acc_line)
 
     torch.save(model.state_dict(), args.save_model)

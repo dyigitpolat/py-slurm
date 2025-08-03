@@ -44,6 +44,21 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    # Always place .py_slurm workspace next to the YAML config file
+    _cfg_dir = os.path.dirname(os.path.abspath(args.config))
+    cfg["_local_root"] = os.path.join(_cfg_dir, ".py_slurm")
+
+    # Prepare push-file mapping (local absolute path, remote relative path)
+    push_entries = []
+    for entry in cfg.get("files", {}).get("push", []):
+        if os.path.isabs(entry):
+            local_abs = entry
+            remote_rel = os.path.basename(entry)
+        else:
+            local_abs = os.path.abspath(os.path.join(_cfg_dir, entry))
+            remote_rel = entry
+        push_entries.append((local_abs, remote_rel))
+    cfg["_push_mapping"] = push_entries
 
     password = _password_from_env(args.password_env)
     if not password and not args.key:
@@ -53,8 +68,27 @@ def main():
 
     try:
         if args.cmd == "submit":
-            setup_remote_env(conn, cfg)
-            submit_all(conn, cfg, user=args.user, host=args.host, monitor=(not args.no_monitor))
+            # Automatically locate env_setup.sh in the same directory as the YAML config (if present)
+            config_dir = os.path.dirname(os.path.abspath(args.config))
+            env_script = os.path.join(config_dir, "env_setup.sh")
+            if os.path.exists(env_script):
+                env_script_path = env_script
+            else:
+                # Fall back to the script bundled with the package (py_slurm/env_setup.sh)
+                bundled_script = os.path.join(os.path.dirname(__file__), "env_setup.sh")
+                env_script_path = bundled_script if os.path.exists(bundled_script) else None
+            _venv_dir, dep_job_id = setup_remote_env(conn, cfg, env_script_path=env_script_path)
+            if dep_job_id:
+                from .core import wait_for_job
+                wait_for_job(conn, dep_job_id)
+            submit_all(
+                conn,
+                cfg,
+                user=args.user,
+                host=args.host,
+                monitor=(not args.no_monitor),
+                dependency_job_id=dep_job_id,
+            )
         elif args.cmd == "monitor":
             monitor(conn, cfg, exp_name=args.exp, job_id=args.job, from_start=args.from_start, lines=args.lines)
         elif args.cmd == "status":

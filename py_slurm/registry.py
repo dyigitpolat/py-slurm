@@ -6,10 +6,27 @@ def _sanitize(path):
     return "".join(ch for ch in path if ch.isalnum() or ch in "+-._")
 
 class Registry:
-    def __init__(self, user, host, remote_base_dir):
+    def __init__(self, user, host, remote_base_dir, local_root: str | None = None):
+        """Create (or load) a run registry.
+
+        Parameters
+        ----------
+        user, host, remote_base_dir
+            Identify the *remote* experiment location – together these make the key.
+        local_root : str or None, optional
+            Directory in which the hidden ``.py_slurm`` workspace should live.
+            If *None* (default), we fall back to ``~/.py_slurm`` (previous
+            behaviour).  Passing the directory that contains the YAML config file
+            lets each experiment set live next to its configuration.
+        """
+
         base_key = f"{user}@{host}:{remote_base_dir}"
         safe_base = _sanitize(base_key)
-        self.root = os.path.join(os.path.expanduser("~/.py_slurm"), safe_base)
+
+        if local_root is None:
+            local_root = os.path.expanduser("~/.py_slurm")
+
+        self.root = os.path.join(os.path.abspath(local_root), safe_base)
         os.makedirs(self.root, exist_ok=True)
         self.results_dir = os.path.join(self.root, "results")
         os.makedirs(self.results_dir, exist_ok=True)
