@@ -1,4 +1,4 @@
-"""slurmster package (renamed from *py_slurm*)."""
+"""slurmster package"""
 
 # Public re-exports can be defined here as needed.
 __all__ = []

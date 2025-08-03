@@ -1,4 +1,4 @@
-# py-slurm
+# slurmster
 
 A minimal Python tool to run parameter-grid experiments on a Slurm cluster with **persistent SSH**, **log streaming**, and **simple YAML configs** — inspired by a small Bash prototype.
 
@@ -16,7 +16,7 @@ A minimal Python tool to run parameter-grid experiments on a Slurm cluster with 
 ## Install (editable)
 
 ```bash
-cd py-slurm
+cd slurmster
 pip install -e .
 ```
 
@@ -28,31 +28,31 @@ Or use a virtual environment first.
 2) Submit jobs — the tool automatically uploads **and schedules** `env_setup.sh` as a lightweight Slurm job (idempotent) so preparation runs on a compute node:
 
 ```bash
-py-slurm --config config.yaml --user <remote_user> --host <remote_host> --password-env SLURM_PASS submit  # optional; otherwise you'll be prompted
+slurmster --config config.yaml --user <remote_user> --host <remote_host> --password-env SLURM_PASS submit  # optional; otherwise you'll be prompted
 ```
 
 3) Stream logs (auto-starts on submit unless `--no-monitor` is passed), or re-attach later:
 
 ```bash
-py-slurm --config config.yaml --user <remote_user> --host <remote_host> monitor --exp exp_lr_0.01_epochs_5  # or --job <jobid>
+slurmster --config config.yaml --user <remote_user> --host <remote_host> monitor --exp exp_lr_0.01_epochs_5  # or --job <jobid>
 ```
 
 4) Check status of **non-fetched** runs:
 
 ```bash
-py-slurm --config config.yaml --user <u> --host <h> status
+slurmster --config config.yaml --user <u> --host <h> status
 ```
 
 5) Fetch finished runs (downloads each run dir into your local workspace):
 
 ```bash
-py-slurm --config config.yaml --user <u> --host <h> fetch
+slurmster --config config.yaml --user <u> --host <h> fetch
 ```
 
 6) Cancel a job:
 
 ```bash
-py-slurm --config example/config.yaml --user <u> --host <h> cancel --exp exp_lr_0.01_epochs_5
+slurmster --config example/config.yaml --user <u> --host <h> cancel --exp exp_lr_0.01_epochs_5
 # or: --job 1234567
 ```
 
@@ -103,7 +103,7 @@ run:
 
 ## Local workspace
 
-Under the **`.py_slurm` directory next to your `config.yaml`** (`<config-dir>/.py_slurm/<user>@<host>/<sanitized-remote-base>`), we store:
+Under the **`.slurmster` directory next to your `config.yaml`** (`<config-dir>/.slurmster/<user>@<host>/<sanitized-remote-base>`), we store:
 - `runs.json` — run registry (job id, exp name, fetched flag, etc.)
 - `results/<exp_name>_<job_id>/...` — fetched run directories
 

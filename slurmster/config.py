@@ -6,7 +6,7 @@ class Config:
     """Minimal configuration container used by JobManager.
 
     Note: The richer YAML-based configuration workflow is implemented in
-    `py_slurm.core`.  This class only exists so that static type checkers
+    `slurmster.core`.  This class only exists so that static type checkers
     (e.g. Pylance) can resolve the symbol when working with the legacy
     JobManager API.
     """

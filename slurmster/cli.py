@@ -74,7 +74,7 @@ def main():
             if os.path.exists(env_script):
                 env_script_path = env_script
             else:
-                # Fall back to the script bundled with the package (py_slurm/env_setup.sh)
+                # Fall back to the script bundled with the package (slurmster/env_setup.sh)
                 bundled_script = os.path.join(os.path.dirname(__file__), "env_setup.sh")
                 env_script_path = bundled_script if os.path.exists(bundled_script) else None
             _venv_dir, dep_job_id = setup_remote_env(conn, cfg, env_script_path=env_script_path)

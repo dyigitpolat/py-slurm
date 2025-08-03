@@ -1,4 +1,4 @@
-"""py_slurm.core (legacy)
+"""slurmster.core (legacy)
 
 This module has been **refactored** into smaller, focused sub-modules for
 maintainability:
