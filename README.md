@@ -2,6 +2,12 @@
 
 A minimal Python tool to run parameter-grid experiments on a Slurm cluster with persistent SSH, log streaming, and simple YAML configs.
 
+## Install
+
+```bash
+pip install slurmster
+```
+
 ![Slurmster GUI](images/gui.png)
 
 ## Features
@@ -15,15 +21,6 @@ A minimal Python tool to run parameter-grid experiments on a Slurm cluster with 
 - Local workspace to track runs and "fetched" state
 - Cancel jobs from local machine
 - Web-based GUI for easy management
-
-## Install
-
-```bash
-cd slurmster
-pip install -e .
-```
-
-Or use a virtual environment first.
 
 ## CLI Usage
 
