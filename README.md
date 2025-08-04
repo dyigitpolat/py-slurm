@@ -1,19 +1,22 @@
 # slurmster
 
-A minimal Python tool to run parameter-grid experiments on a Slurm cluster with **persistent SSH**, **log streaming**, and **simple YAML configs** — inspired by a small Bash prototype.
+A minimal Python tool to run parameter-grid experiments on a Slurm cluster with persistent SSH, log streaming, and simple YAML configs.
 
-## Highlights
+![Slurmster GUI](images/gui.png)
 
-- **CLI** with subcommands: `submit`, `monitor`, `status`, `fetch`, `cancel`
-- **YAML** config (explicitly provided via `--config`)
-- **Persistent SSH** connection for low latency
-- **Per-run working directories** on the remote side
-- **Automatic log redirection** to `stdout.log` inside each run directory
-- **Live log streaming** (and re-attach later)
-- **Local workspace** to track runs and “fetched” state
-- **Cancel jobs** from local machine
+## Features
 
-## Install (editable)
+- CLI with subcommands: `submit`, `monitor`, `status`, `fetch`, `cancel`, `gui`
+- YAML config (explicitly provided via `--config`)
+- Persistent SSH connection for low latency
+- Per-run working directories on the remote side
+- Automatic log redirection to `stdout.log` inside each run directory
+- Live log streaming (and re-attach later)
+- Local workspace to track runs and "fetched" state
+- Cancel jobs from local machine
+- Web-based GUI for easy management
+
+## Install
 
 ```bash
 cd slurmster
@@ -22,43 +25,68 @@ pip install -e .
 
 Or use a virtual environment first.
 
-## Quick start
+## CLI Usage
 
-1) Prepare a config (see `example/config.yaml`).  
-2) Submit jobs — the tool automatically uploads **and schedules** `env_setup.sh` as a lightweight Slurm job (idempotent) so preparation runs on a compute node:
-
-```bash
-slurmster --config config.yaml --user <remote_user> --host <remote_host> --password-env SLURM_PASS submit  # optional; otherwise you'll be prompted
-```
-
-3) Stream logs (auto-starts on submit unless `--no-monitor` is passed), or re-attach later:
+All commands follow this pattern:
 
 ```bash
-slurmster --config config.yaml --user <remote_user> --host <remote_host> monitor --exp exp_lr_0.01_epochs_5  # or --job <jobid>
+slurmster --config <config.yaml> --user <username> --host <hostname> [options] <command>
 ```
 
-4) Check status of **non-fetched** runs:
+### Basic Commands
 
+**Submit experiments:**
 ```bash
-slurmster --config config.yaml --user <u> --host <h> status
+slurmster --config config.yaml --user myuser --host myhost submit
 ```
 
-5) Fetch finished runs (downloads each run dir into your local workspace):
-
+**Monitor logs:**
 ```bash
-slurmster --config config.yaml --user <u> --host <h> fetch
+slurmster --config config.yaml --user myuser --host myhost monitor --exp exp_lr_0.01_epochs_5
+# or by job ID:
+slurmster --config config.yaml --user myuser --host myhost monitor --job 1234567
 ```
 
-6) Cancel a job:
-
+**Check status:**
 ```bash
-slurmster --config example/config.yaml --user <u> --host <h> cancel --exp exp_lr_0.01_epochs_5
-# or: --job 1234567
+slurmster --config config.yaml --user myuser --host myhost status
 ```
 
-## YAML schema
+**Fetch completed runs:**
+```bash
+slurmster --config config.yaml --user myuser --host myhost fetch
+```
 
-# YAML skeleton
+**Cancel jobs:**
+```bash
+slurmster --config config.yaml --user myuser --host myhost cancel --exp exp_lr_0.01_epochs_5
+# or cancel all:
+slurmster --config config.yaml --user myuser --host myhost cancel --all
+```
+
+### Additional Options
+
+- `--password-env ENV_VAR`: Use password from environment variable
+- `--key /path/to/key`: Use SSH key file instead of password
+- `--port 22`: Specify SSH port (default: 22)
+
+For submit:
+- `--no-monitor`: Don't automatically start monitoring after submission
+
+For monitor:
+- `--from-start`: Stream from beginning instead of last 100 lines
+- `--lines N`: Number of trailing lines when attaching (default: 100)
+
+For status:
+- `--all`: Show all runs (default: only non-fetched)
+
+For fetch:
+- `--exp <name>`: Only fetch a specific experiment
+
+## Configuration File
+
+Create a YAML config file (see `example/config.yaml`):
+
 ```yaml
 remote:
   base_dir: ~/experiments            # remote working root
@@ -83,7 +111,7 @@ slurm:
 run:
   command: |                         # your run command; placeholders allowed
     source venv/bin/activate
-    python example/train.py --lr {lr} --epochs {epochs}           --save_model "{run_dir}/model.pth" --log_file "{run_dir}/log.txt"
+    python example/train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth" --log_file "{run_dir}/log.txt"
 
   # ONE of the following:
   grid:
@@ -106,6 +134,43 @@ run:
 Under the **`.slurmster` directory next to your `config.yaml`** (`<config-dir>/.slurmster/<user>@<host>/<sanitized-remote-base>`), we store:
 - `runs.json` — run registry (job id, exp name, fetched flag, etc.)
 - `results/<exp_name>_<job_id>/...` — fetched run directories
+
+## GUI Usage
+
+For a more user-friendly experience, you can use the web-based GUI:
+
+```bash
+slurmster --config config.yaml --user myuser --host myhost gui
+```
+
+Additional GUI options:
+- `--gui-port 8000`: Set the HTTP port (default: 8000)
+- `--gui-bind 0.0.0.0`: Set the bind interface (default: 0.0.0.0)
+- `--no-browser`: Don't automatically open browser
+
+The GUI provides:
+
+**Configuration Management:**
+- View and edit your current configuration
+- See resolved placeholders and SLURM directives
+- Modify files to push/fetch and run commands
+
+**Job Submission:**
+- Submit single jobs with custom parameters
+- Submit grid jobs with parameter combinations
+- Real-time parameter validation
+
+**Job Monitoring:**
+- View all jobs with their current status
+- Monitor and browse job outputs in real-time
+- Access job logs directly in the browser
+
+**Bulk Operations:**
+- Fetch all completed jobs at once
+- Cancel multiple jobs
+- Track job progress and completion status
+
+The GUI automatically opens in your browser at `http://localhost:8000` (or your specified port) and provides an intuitive interface for all slurmster functionality.
 
 ## License
 
