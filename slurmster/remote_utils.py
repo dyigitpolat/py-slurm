@@ -91,6 +91,9 @@ def _remote_exists(conn: SSHConnection, path: str) -> bool:
 
 
 def _run_state_from_markers(conn: SSHConnection, run_dir: str) -> str:
+    # Highest priority: explicit cancel marker
+    if _remote_exists(conn, posixpath.join(run_dir, ".cancelled")):
+        return "CANCELLED"
     if _remote_exists(conn, posixpath.join(run_dir, ".finished")):
         return "FINISHED"
     if _remote_exists(conn, posixpath.join(run_dir, ".running")):

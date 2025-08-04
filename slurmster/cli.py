@@ -2,7 +2,16 @@ import os
 import getpass
 import argparse
 from .connection import SSHConnection
-from .core import load_config, setup_remote_env, submit_all, monitor, status, fetch, cancel
+from .core import (
+    load_config,
+    setup_remote_env,
+    submit_all,
+    monitor,
+    status,
+    fetch,
+    cancel,
+    cancel_all,
+)
 
 def _password_from_env(env):
     if not env:
@@ -36,10 +45,16 @@ def main():
     p_fetch = sub.add_parser("fetch", help="Fetch finished runs to local workspace")
     p_fetch.add_argument("--exp", help="Only fetch a single experiment by name")
 
-    p_cancel = sub.add_parser("cancel", help="Cancel a job")
+    p_cancel = sub.add_parser("cancel", help="Cancel jobs")
     g2 = p_cancel.add_mutually_exclusive_group(required=True)
-    g2.add_argument("--exp", help="Experiment name to cancel")
-    g2.add_argument("--job", help="Job ID to cancel")
+    g2.add_argument("--exp", help="Cancel a single experiment by name")
+    g2.add_argument("--job", help="Cancel a single job by ID")
+    g2.add_argument("--all", action="store_true", help="Cancel all jobs tracked in this base directory")
+
+    p_gui = sub.add_parser("gui", help="Launch interactive web UI")
+    p_gui.add_argument("--gui-port", dest="gui_port", type=int, default=8000, help="HTTP port for web UI (default 8000)")
+    p_gui.add_argument("--gui-bind", dest="gui_bind", default="0.0.0.0", help="Bind interface (default 0.0.0.0)")
+    p_gui.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
 
     args = parser.parse_args()
 
@@ -60,14 +75,38 @@ def main():
         push_entries.append((local_abs, remote_rel))
     cfg["_push_mapping"] = push_entries
 
-    password = _password_from_env(args.password_env)
-    if not password and not args.key:
-        password = getpass.getpass(f"SSH password for {args.user}@{args.host}: ")
+    # Special case: we open the SSH connection lazily for GUI so the server can
+    # create fresh connections per request. For all other commands we connect
+    # immediately here.
+    if args.cmd != "gui":
+        password = _password_from_env(args.password_env)
+        if not password and not args.key:
+            password = getpass.getpass(f"SSH password for {args.user}@{args.host}: ")
 
-    conn = SSHConnection(host=args.host, user=args.user, port=args.port, password=password, key_filename=args.key).connect()
+        conn = SSHConnection(host=args.host, user=args.user, port=args.port, password=password, key_filename=args.key).connect()
 
     try:
-        if args.cmd == "submit":
+        if args.cmd == "gui":
+            # Password handling (prompt only once here)
+            password = _password_from_env(args.password_env)
+            if not password and not args.key:
+                password = getpass.getpass(f"SSH password for {args.user}@{args.host}: ")
+            from .gui_server import run_server
+            import webbrowser, threading
+
+            if not args.no_browser:
+                threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{args.gui_port}")).start()
+            run_server(
+                cfg,
+                ssh_user=args.user,
+                ssh_host=args.host,
+                ssh_port=args.port,
+                password=password,
+                key_filename=args.key,
+                bind_host=args.gui_bind,
+                bind_port=args.gui_port,
+            )
+        elif args.cmd == "submit":
             # Automatically locate env_setup.sh in the same directory as the YAML config (if present)
             config_dir = os.path.dirname(os.path.abspath(args.config))
             env_script = os.path.join(config_dir, "env_setup.sh")
@@ -96,6 +135,10 @@ def main():
         elif args.cmd == "fetch":
             fetch(conn, cfg, exp_name=args.exp)
         elif args.cmd == "cancel":
-            cancel(conn, cfg, exp_name=args.exp, job_id=args.job)
+            if getattr(args, "all", False):
+                cancel_all(conn, cfg)
+            else:
+                cancel(conn, cfg, exp_name=args.exp, job_id=args.job)
     finally:
-        conn.close()
+        if args.cmd != "gui":
+            conn.close()

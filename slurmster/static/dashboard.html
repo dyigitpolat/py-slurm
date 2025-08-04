@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slurmster Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .input-field{border:1px solid #cbd5e1;border-radius:.25rem;padding:.25rem;font-size:.875rem;width:100%;}
+    .code-field{background:#1e293b;color:#f1f5f9;font-family:monospace;}
+    .code-wrapper{position:relative;}
+    .code-wrapper pre{background:#1e293b;color:#f1f5f9;font-family:monospace;font-size:.875rem;line-height:1.25rem;padding:.25rem;border:1px solid #cbd5e1;border-radius:.25rem;white-space:pre-wrap;word-wrap:break-word;pointer-events:none;overflow:auto;box-sizing:border-box;margin:0;}
+    .code-wrapper textarea{position:absolute;top:0;left:0;width:100%;height:100%;background:transparent;color:transparent;caret-color:#f1f5f9;font-family:monospace;font-size:.875rem;line-height:1.25rem;resize:none;border:1px solid transparent;padding:.25rem;box-sizing:border-box;margin:0;outline:none;}
+    .hl-ok{color:#4ade80;font-weight:bold;}
+    .hl-missing{color:#f87171;font-weight:bold;}
+    .cursor-not-allowed{cursor:not-allowed !important;}
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen antialiased">
+  <div class="container mx-auto p-6">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-semibold text-slate-800">Slurmster Dashboard</h1>
+      <div></div>
+    </header>
+
+    <!-- Config Panels -->
+    <div id="config-area" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"></div>
+
+    <div class="overflow-x-auto bg-white rounded-lg shadow">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead id="table-head" class="bg-gray-50"></thead>
+        <tbody id="jobs-tbody" class="bg-white divide-y divide-gray-200"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Log modal -->
+  <div id="log-modal" class="fixed inset-0 bg-black/50 items-center justify-center hidden">
+    <div class="bg-white rounded-lg w-full max-w-3xl p-4 flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-center mb-2">
+        <h2 id="log-title" class="text-lg font-semibold"></h2>
+        <button id="close-modal" class="text-gray-600 hover:text-gray-800">✖</button>
+      </div>
+      <pre id="log-content" class="flex-1 overflow-y-auto bg-black text-white p-3 rounded"></pre>
+    </div>
+  </div>
+
+  <!-- File browser modal -->
+  <div id="browse-modal" class="fixed inset-0 bg-black/50 items-center justify-center hidden">
+    <div class="bg-white rounded-lg w-full max-w-5xl p-4 flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h2 id="browse-title" class="text-lg font-semibold"></h2>
+          <p id="browse-path" class="text-sm text-gray-600"></p>
+        </div>
+        <button id="close-browse-modal" class="text-gray-600 hover:text-gray-800 text-xl">✖</button>
+      </div>
+      
+      <div class="flex items-center space-x-2 mb-4">
+        <button id="browse-up" class="px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm" disabled>↑ Up</button>
+        <button id="browse-refresh" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">🔄 Refresh</button>
+        <div id="browse-loading" class="hidden">
+          <svg class="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="browse-files" class="bg-white divide-y divide-gray-200">
+          </tbody>
+        </table>
+        <div id="browse-empty" class="text-center py-8 text-gray-500 hidden">
+          No files found in this directory.
+        </div>
+        <div id="browse-error" class="text-center py-8 text-red-500 hidden">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html> 
