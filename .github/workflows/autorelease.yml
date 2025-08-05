@@ -1,0 +1,95 @@
+# .github/workflows/auto-release.yml
+name: Auto Release
+
+on:
+  push:
+    branches: [ main, master ]  # Adjust branch name as needed
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        pip install toml
+
+    - name: Get current version
+      id: current_version
+      run: |
+        python -c "
+import toml
+with open('pyproject.toml', 'r') as f:
+    data = toml.load(f)
+print('version=' + data['project']['version'])
+        " >> $GITHUB_OUTPUT
+
+    - name: Bump version
+      id: bump_version
+      run: |
+        python -c "
+import toml
+import re
+
+with open('pyproject.toml', 'r') as f:
+    data = toml.load(f)
+
+current_version = data['project']['version']
+# Parse version (assumes semantic versioning: major.minor.patch)
+version_parts = current_version.split('.')
+major, minor, patch = int(version_parts[0]), int(version_parts[1]), int(version_parts[2])
+
+# Increment patch version (you can customize this logic)
+patch += 1
+new_version = f'{major}.{minor}.{patch}'
+
+# Update version in pyproject.toml
+data['project']['version'] = new_version
+
+with open('pyproject.toml', 'w') as f:
+    toml.dump(data, f)
+
+print(f'new_version={new_version}')
+        " >> $GITHUB_OUTPUT
+
+    - name: Commit version bump
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add pyproject.toml
+        git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}" || exit 0
+
+    - name: Push changes
+      run: git push
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.bump_version.outputs.new_version }}
+        release_name: Release v${{ steps.bump_version.outputs.new_version }}
+        body: |
+          Auto-generated release for version ${{ steps.bump_version.outputs.new_version }}
+          
+          ## Changes
+          - Version bumped from ${{ steps.current_version.outputs.version }} to ${{ steps.bump_version.outputs.new_version }}
+          
+          ## Commit
+          ${{ github.event.head_commit.message }}
+        draft: false
+        prerelease: false
