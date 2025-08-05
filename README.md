@@ -8,7 +8,7 @@ A minimal Python tool to run parameter-grid experiments on a Slurm cluster with 
 pip install slurmster
 ```
 
-![Slurmster GUI](images/gui.png)
+![Slurmster GUI](https://github.com/dyigitpolat/slurmster/raw/main/images/gui.png)
 
 ## Features
 
