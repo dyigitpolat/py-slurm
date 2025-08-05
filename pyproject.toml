@@ -15,3 +15,7 @@ slurmster = "slurmster.cli:main"
 
 [tool.setuptools]
 packages = [ "slurmster",]
+include-package-data = true
+
+[tool.setuptools.package-data]
+slurmster = ["static/*"]
