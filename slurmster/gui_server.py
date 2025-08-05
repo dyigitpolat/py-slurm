@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -18,7 +18,7 @@ from .remote_utils import _resolve_remote_path, _run_state_from_markers, _squeue
 # Helper utilities
 # -----------------------------------------------------------------------------
 
-def _open_conn(host: str, user: str, port: int, password: str | None = None, key_filename: str | None = None) -> SSHConnection:
+def _open_conn(host: str, user: str, port: int, password: Optional[str] = None, key_filename: Optional[str] = None) -> SSHConnection:
     """Open a fresh SSH connection. Each request uses its own connection so we
     don't share Paramiko clients across threads (FastAPI's default concurrency
     model may run endpoints on different threads).
@@ -84,7 +84,7 @@ def _list_jobs(conn: SSHConnection, cfg) -> list[Dict[str, Any]]:
 # FastAPI application factory
 # -----------------------------------------------------------------------------
 
-def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, password: str | None = None, key_filename: str | None = None) -> FastAPI:
+def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, password: Optional[str] = None, key_filename: Optional[str] = None) -> FastAPI:
     """Create the FastAPI application bound to a specific SSH host/user.
 
     The configuration is passed in-memory so the server does not parse YAML on
@@ -440,7 +440,7 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
 # Public entry point used by the CLI wrapper
 # -----------------------------------------------------------------------------
 
-def run_server(cfg, *, ssh_user: str, ssh_host: str, ssh_port: int = 22, password: str | None = None, key_filename: str | None = None, bind_host: str = "0.0.0.0", bind_port: int = 8000):
+def run_server(cfg, *, ssh_user: str, ssh_host: str, ssh_port: int = 22, password: Optional[str] = None, key_filename: Optional[str] = None, bind_host: str = "0.0.0.0", bind_port: int = 8000):
     """Blocking call: start the Uvicorn server (HTTP)."""
 
     app = create_app(

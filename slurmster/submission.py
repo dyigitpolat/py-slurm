@@ -1,6 +1,7 @@
 import os
 import posixpath
 import time
+from typing import Optional
 from .connection import SSHConnection
 from .remote_utils import _resolve_remote_path, _parse_job_id
 from .utils import expand_grid, make_exp_name, substitute_placeholders
@@ -52,7 +53,7 @@ def submit_all(
     user: str,
     host: str,
     monitor: bool = True,
-    dependency_job_id: str | None = None,
+    dependency_job_id: Optional[str] = None,
 ):
     remote_dir = _resolve_remote_path(conn, cfg["remote"]["base_dir"])
 

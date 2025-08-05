@@ -1,12 +1,13 @@
 import json
 import os
+from typing import Optional
 
 def _sanitize(path):
     # keep alnum+-._ and strip others
     return "".join(ch for ch in path if ch.isalnum() or ch in "+-._")
 
 class Registry:
-    def __init__(self, user, host, remote_base_dir, local_root: str | None = None):
+    def __init__(self, user, host, remote_base_dir, local_root: Optional[str] = None):
         """Create (or load) a run registry.
 
         Parameters

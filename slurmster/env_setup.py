@@ -1,6 +1,7 @@
 import os
 import posixpath
 import yaml
+from typing import Optional, Tuple
 from .connection import SSHConnection
 from .remote_utils import _resolve_remote_path, _parse_job_id
 
@@ -34,7 +35,7 @@ def load_config(path):
     return cfg
 
 
-def setup_remote_env(conn: SSHConnection, cfg, env_script_path: str | None = None):
+def setup_remote_env(conn: SSHConnection, cfg, env_script_path: Optional[str] = None):
     """Prepare remote directories, upload source files, and **schedule** environment setup.
 
     Heavy-weight environment preparation (creating a virtualenv, installing deps) is
@@ -70,7 +71,7 @@ def setup_remote_env(conn: SSHConnection, cfg, env_script_path: str | None = Non
         conn.mkdirs(posixpath.dirname(dest))
         conn.put_file(local_path, dest)
 
-    env_job_id: str | None = None
+    env_job_id: Optional[str] = None
 
     # Upload & **submit** env_setup.sh as its own Slurm job (optional)
     if env_script_path and os.path.exists(env_script_path):
