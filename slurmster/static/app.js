@@ -455,7 +455,7 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
       </div>
       <div>
         <label class="text-sm font-medium text-gray-700">Environment Setup Script</label>
-        ${createTextarea('env-setup', cfg.env_setup || '', 'env_setup.sh (optional)', 1)}
+        ${createTextarea('env-setup', cfg.env_setup || '', 'env_setup.sh (optional)', 2)}
       </div>
       <div>
         <label class="text-sm font-medium text-gray-700">Run Command</label>
@@ -621,9 +621,8 @@ async function saveFullConfig(keys) {
   });
   
   const runConfig = { command: runCmd, grid };
-  if (envSetup) {
-    runConfig.env_setup = envSetup;
-  }
+  // Always include env_setup field, even if empty
+  runConfig.env_setup = envSetup || null;
   
   const fullConfig = {
     run: runConfig,
@@ -644,6 +643,7 @@ function updateHighlighters(keys) {
   setupHighlighter('files-push-pre', 'files-push', keys);
   setupHighlighter('files-fetch-pre', 'files-fetch', keys);
   setupHighlighter('slurm-directives-pre', 'slurm-directives', keys);
+  setupHighlighter('env-setup-pre', 'env-setup', keys);
   setupHighlighter('run-command-pre', 'run-command', keys);
 }
 

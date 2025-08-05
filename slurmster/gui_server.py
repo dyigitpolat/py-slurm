@@ -115,7 +115,25 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
         """
         conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
         try:
-            submit_all(conn, cfg, user=ssh_user, host=ssh_host, monitor=False)
+            # Handle env_setup like the CLI does
+            from .env_setup import setup_remote_env
+            import os
+            env_script_path = cfg["run"].get("env_setup")
+            dep_job_id = None
+            if env_script_path:
+                # Resolve relative paths relative to the config file directory
+                # The _local_root is set to config_dir/.slurmster in CLI
+                if not os.path.isabs(env_script_path) and "_local_root" in cfg:
+                    config_dir = os.path.dirname(cfg["_local_root"])  # Remove the /.slurmster part
+                    env_script_path = os.path.join(config_dir, env_script_path)
+                elif not os.path.isabs(env_script_path):
+                    env_script_path = os.path.abspath(env_script_path)
+                _venv_dir, dep_job_id = setup_remote_env(conn, cfg, env_script_path=env_script_path)
+                if dep_job_id:
+                    from .core import wait_for_job
+                    wait_for_job(conn, dep_job_id)
+            
+            submit_all(conn, cfg, user=ssh_user, host=ssh_host, monitor=False, dependency_job_id=dep_job_id)
             return {"detail": "submitted"}
         finally:
             conn.close()
@@ -135,7 +153,25 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
 
         conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
         try:
-            submit_all(conn, single_cfg, user=ssh_user, host=ssh_host, monitor=False)
+            # Handle env_setup like the CLI does
+            from .env_setup import setup_remote_env
+            import os
+            env_script_path = single_cfg["run"].get("env_setup")
+            dep_job_id = None
+            if env_script_path:
+                # Resolve relative paths relative to the config file directory
+                # The _local_root is set to config_dir/.slurmster in CLI
+                if not os.path.isabs(env_script_path) and "_local_root" in single_cfg:
+                    config_dir = os.path.dirname(single_cfg["_local_root"])  # Remove the /.slurmster part
+                    env_script_path = os.path.join(config_dir, env_script_path)
+                elif not os.path.isabs(env_script_path):
+                    env_script_path = os.path.abspath(env_script_path)
+                _venv_dir, dep_job_id = setup_remote_env(conn, single_cfg, env_script_path=env_script_path)
+                if dep_job_id:
+                    from .core import wait_for_job
+                    wait_for_job(conn, dep_job_id)
+            
+            submit_all(conn, single_cfg, user=ssh_user, host=ssh_host, monitor=False, dependency_job_id=dep_job_id)
             return {"detail": "submitted single"}
         finally:
             conn.close()
