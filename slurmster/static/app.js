@@ -648,11 +648,21 @@ function updateHighlighters(keys) {
 }
 
 // escape html
-function esc(str){return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(str) {
+  return str.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+}
 
-function highlightCmd(text, validKeys){return text.replace(/\{([^}]+)\}/g,(m,key)=>{
-  if(validKeys.includes(key)||key==='run_dir')return `<span class="hl-ok">${esc(m)}</span>`;
-  return `<span class="hl-missing">${esc(m)}</span>`;});}
+function highlightCmd(text, validKeys){
+  const knownPlaceholders = ['base_dir', 'remote_dir', 'run_dir', ...validKeys];
+  return text.replace(/\{([^}]+)\}/g,(m,key)=>{
+    if(knownPlaceholders.includes(key))return `<span class="hl-ok">${m}</span>`;
+    return `<span class="hl-missing">${m}</span>`;
+  });
+}
 
 function setupHighlighter(areaId,taId,keys){const ta=document.getElementById(taId);const pre=document.getElementById(areaId);
   const update=()=>{pre.innerHTML=highlightCmd(esc(ta.value),keys);};
