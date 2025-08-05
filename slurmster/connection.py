@@ -1,6 +1,7 @@
 import os
 import posixpath
 import paramiko
+import shlex
 from stat import S_ISDIR
 
 class SSHConnection:
@@ -48,13 +49,13 @@ class SSHConnection:
             self._client = None
 
     # ------------- Exec helpers -------------
-
     def bash(self, command, get_pty=False):
         # Run a command under bash -lc so that PATH and expansions work.
         # Returns (exit_status, stdout_text, stderr_text).
         if not self._client:
             raise RuntimeError("SSHConnection not connected")
-        cmd = f'bash -lc "{command.replace('"', r'\"')}"'
+        # Use shlex.quote for proper shell escaping instead of fragile string replacement
+        cmd = f'bash -lc {shlex.quote(command)}'
         stdin, stdout, stderr = self._client.exec_command(cmd, get_pty=get_pty)
         # Read complete output (but do not automatically echo it).
         out = stdout.read().decode("utf-8", "ignore")
@@ -74,7 +75,8 @@ class SSHConnection:
             raise RuntimeError("No transport")
         channel = transport.open_session()
         channel.get_pty()
-        channel.exec_command(f"bash -lc {repr(cmd)}")
+        # Use shlex.quote for consistent escaping behavior
+        channel.exec_command(f"bash -lc {shlex.quote(cmd)}")
         buff = b""
         try:
             while True:
