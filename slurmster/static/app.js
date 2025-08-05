@@ -69,10 +69,37 @@ function stateBadge(st, fetched = false) {
 }
 
 function actionButtons(job) {
-  const cancel = `<button onclick="cancelJob('${job.job_id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md">Cancel</button>`;
-  const monitor = job.job_id ? `<button onclick="monitorJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md">Monitor</button>` : '';
-  const fetch = (job.state === 'FINISHED' && !job.fetched) ? `<button onclick="fetchJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md">Fetch</button>` : '';
-  const browse = job.run_dir ? `<button onclick="browseJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md">Browse</button>` : '';
+  // Cancel button - only enabled for PENDING and RUNNING jobs
+  const canCancel = ['PENDING', 'RUNNING'].includes(job.state);
+  const cancelClass = canCancel 
+    ? 'px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md cursor-pointer'
+    : 'px-3 py-1 bg-gray-400 text-gray-200 rounded-md cursor-not-allowed';
+  const cancelClick = canCancel ? `onclick="cancelJob('${job.job_id}')"` : '';
+  const cancel = `<button ${cancelClick} class="${cancelClass}" ${canCancel ? '' : 'disabled'}>Cancel</button>`;
+
+  // Monitor button - always enabled if job_id exists
+  const monitor = job.job_id 
+    ? `<button onclick="monitorJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md">Monitor</button>` 
+    : `<button class="ml-2 px-3 py-1 bg-gray-400 text-gray-200 rounded-md cursor-not-allowed" disabled>Monitor</button>`;
+
+  // Fetch button - always enabled if job_id exists
+  const canFetch = !!job.job_id;
+  const fetchClass = canFetch
+    ? 'ml-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md cursor-pointer'
+    : 'ml-2 px-3 py-1 bg-gray-400 text-gray-200 rounded-md cursor-not-allowed';
+  const fetchClick = canFetch ? `onclick="fetchJob('${job.job_id}')"` : '';
+  const fetchTitle = job.fetched ? 'Re-fetch files' : 'Fetch job files';
+  const fetch = `<button ${fetchClick} class="${fetchClass}" ${canFetch ? '' : 'disabled'} title="${fetchTitle}">Fetch</button>`;
+
+  // Browse button - enabled if run_dir exists
+  const canBrowse = !!job.run_dir;
+  const browseClass = canBrowse
+    ? 'ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md cursor-pointer'
+    : 'ml-2 px-3 py-1 bg-gray-400 text-gray-200 rounded-md cursor-not-allowed';
+  const browseClick = canBrowse ? `onclick="browseJob('${job.job_id}')"` : '';
+  const browseTitle = !canBrowse ? 'No run directory available' : '';
+  const browse = `<button ${browseClick} class="${browseClass}" ${canBrowse ? '' : 'disabled'} title="${browseTitle}">Browse</button>`;
+
   return cancel + monitor + fetch + browse;
 }
 
