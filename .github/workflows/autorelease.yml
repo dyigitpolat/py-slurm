@@ -83,7 +83,7 @@ jobs:
     - name: Create Release and Upload Assets
       uses: softprops/action-gh-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ steps.bump_version.outputs.new_version }}
         name: Release v${{ steps.bump_version.outputs.new_version }}
@@ -99,3 +99,8 @@ jobs:
           dist/*
         draft: false
         prerelease: false
+
+    - name: Publish package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
