@@ -26,7 +26,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install toml
+        pip install toml build
 
     - name: Get current version
       id: current_version
@@ -66,6 +66,10 @@ jobs:
         print(f'new_version={new_version}')
         " >> $GITHUB_OUTPUT
 
+    - name: Build package
+      run: |
+        python -m build
+
     - name: Commit version bump
       run: |
         git config --local user.email "action@github.com"
@@ -76,13 +80,13 @@ jobs:
     - name: Push changes
       run: git push
 
-    - name: Create Release
-      uses: actions/create-release@v1
+    - name: Create Release and Upload Assets
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ steps.bump_version.outputs.new_version }}
-        release_name: Release v${{ steps.bump_version.outputs.new_version }}
+        name: Release v${{ steps.bump_version.outputs.new_version }}
         body: |
           Auto-generated release for version ${{ steps.bump_version.outputs.new_version }}
           
@@ -91,5 +95,7 @@ jobs:
           
           ## Commit
           ${{ github.event.head_commit.message }}
+        files: |
+          dist/*
         draft: false
         prerelease: false
