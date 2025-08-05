@@ -415,7 +415,7 @@ async function buildConfigPanels(){
   
   // Helpers
   const createInput=(id,val='',placeholder='')=>`<input id="${id}" class="input-field" value="${val}" placeholder="${placeholder}"/>`;
-  const createTextarea=(id,val='',placeholder='',rows=3)=>`<div class="code-wrapper"><pre id="${id}-pre"></pre><textarea id="${id}" class="input-field code-field" rows="${rows}" placeholder="${placeholder}">${val}</textarea></div>`;
+  const createTextarea=(id,val='',placeholder='',rows=3)=>`<div class="code-wrapper"><div class="line-numbers" id="${id}-line-numbers"></div><pre id="${id}-pre"></pre><textarea id="${id}" class="input-field code-field" rows="${rows}" placeholder="${placeholder}">${val}</textarea></div>`;
   
   // Determine param keys
   const grid=cfg.grid||{};const exp=(cfg.experiments&&cfg.experiments[0])||{};const keys=Array.from(new Set([...Object.keys(grid),...Object.keys(exp)]));
@@ -698,10 +698,93 @@ function highlightCmd(text, validKeys){
   });
 }
 
-function setupHighlighter(areaId,taId,keys){const ta=document.getElementById(taId);const pre=document.getElementById(areaId);
-  const update=()=>{pre.innerHTML=highlightCmd(esc(ta.value),keys);};
-  ta.addEventListener('input',update);update();
-  ta.addEventListener('scroll',()=>{pre.scrollTop=ta.scrollTop;pre.scrollLeft=ta.scrollLeft;});}
+function setupHighlighter(areaId,taId,keys){
+  const ta=document.getElementById(taId);
+  const pre=document.getElementById(areaId);
+  const lineNumbers=document.getElementById(taId + '-line-numbers');
+  
+  const updateLineNumbers=()=>{
+    // Only count actual newline characters, not wrapped lines
+    const textLines = ta.value.split('\n');
+    const lineCount = textLines.length;
+    
+    // Create line numbers with proper spacing for wrapped content
+    const taStyle = getComputedStyle(ta);
+    const lineHeight = parseFloat(taStyle.lineHeight);
+    
+    // Clear and rebuild line numbers
+    lineNumbers.innerHTML = '';
+    
+    // For each logical line, calculate if it wraps and position accordingly
+    const tempDiv = document.createElement('div');
+    tempDiv.style.cssText = `
+      position: absolute;
+      visibility: hidden;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: ${taStyle.fontFamily};
+      font-size: ${taStyle.fontSize};
+      line-height: ${taStyle.lineHeight};
+      width: ${ta.clientWidth - parseInt(taStyle.paddingLeft) - parseInt(taStyle.paddingRight)}px;
+      padding: 0;
+      border: none;
+      margin: 0;
+    `;
+    document.body.appendChild(tempDiv);
+    
+    let currentVisualLine = 0;
+    
+    for (let i = 0; i < lineCount; i++) {
+      const lineContent = textLines[i];
+      
+      // Position the line number at the start of this logical line
+      const lineNumber = document.createElement('div');
+      lineNumber.textContent = i + 1;
+      lineNumber.style.cssText = `
+        position: absolute;
+        top: ${currentVisualLine * lineHeight + parseInt(taStyle.paddingTop)}px;
+        right: 0.5rem;
+        line-height: ${lineHeight}px;
+        color: #64748b;
+      `;
+      lineNumbers.appendChild(lineNumber);
+      
+      // Calculate how many visual lines this logical line takes
+      if (lineContent.trim() === '') {
+        // Empty line takes exactly 1 visual line
+        currentVisualLine += 1;
+      } else {
+        tempDiv.textContent = lineContent;
+        const visualLinesForThisLine = Math.max(1, Math.ceil(tempDiv.scrollHeight / lineHeight));
+        currentVisualLine += visualLinesForThisLine;
+      }
+    }
+    
+    document.body.removeChild(tempDiv);
+    
+    // Set the height of line numbers container to match calculated height
+    lineNumbers.style.height = `${currentVisualLine * lineHeight + parseInt(taStyle.paddingTop) + parseInt(taStyle.paddingBottom)}px`;
+  };
+  
+  const update=()=>{
+    pre.innerHTML=highlightCmd(esc(ta.value),keys);
+    updateLineNumbers();
+  };
+  
+  ta.addEventListener('input',update);
+  update();
+  ta.addEventListener('scroll',()=>{
+    pre.scrollTop=ta.scrollTop;
+    pre.scrollLeft=ta.scrollLeft;
+    lineNumbers.scrollTop=ta.scrollTop;
+  });
+  
+  // Handle resize events to maintain alignment
+  const resizeObserver = new ResizeObserver(() => {
+    updateLineNumbers();
+  });
+  resizeObserver.observe(ta);
+}
 
 // ---------------------------------------------------------------------------
 // Init
