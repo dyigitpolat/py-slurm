@@ -69,10 +69,10 @@ function stateBadge(st, fetched = false) {
 }
 
 function actionButtons(job) {
-  const cancel = (!job.job_id || ['FINISHED','CANCELLED'].includes(job.state)) ? '' : `<button onclick="cancelJob('${job.job_id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md">Cancel</button>`;
-  const monitor = job.job_id ? `<button onclick="monitorJob('${job.job_id}','${job.exp_name}')" class="ml-2 px-3 py-1 bg-gray-700 hover:bg-gray-800 text-white rounded-md">Monitor</button>` : '';
-  const fetch = (job.state === 'FINISHED' && !job.fetched) ? `<button onclick="fetchJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md">Fetch</button>` : '';
-  const browse = job.run_dir ? `<button onclick="browseJob('${job.exp_name}')" class="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md">Browse</button>` : '';
+  const cancel = `<button onclick="cancelJob('${job.job_id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md">Cancel</button>`;
+  const monitor = job.job_id ? `<button onclick="monitorJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md">Monitor</button>` : '';
+  const fetch = (job.state === 'FINISHED' && !job.fetched) ? `<button onclick="fetchJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md">Fetch</button>` : '';
+  const browse = job.run_dir ? `<button onclick="browseJob('${job.job_id}')" class="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md">Browse</button>` : '';
   return cancel + monitor + fetch + browse;
 }
 
@@ -197,20 +197,17 @@ async function fetchAllFinished(){
 // ---------------------------------------------------------------------------
 // File browser functionality
 // ---------------------------------------------------------------------------
-let currentBrowseExp = '';
 let currentBrowsePath = '';
+let currentBrowseJobId = '';
 
-async function browseJob(expName) {
-  currentBrowseExp = expName;
-  currentBrowsePath = '';
+async function browseJob(jobId) {
+  // Store the current job_id for browsing
+  currentBrowseJobId = jobId;
   
-  const modal = document.getElementById('browse-modal');
-  const title = document.getElementById('browse-title');
+  // Show browse modal  
+  document.getElementById('browse-modal').classList.remove('hidden');
   
-  title.textContent = `Browse Files: ${expName}`;
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-  
+  // Load root directory
   await loadDirectory('');
 }
 
@@ -239,7 +236,7 @@ async function loadDirectory(path) {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
     
-    const response = await api(`/api/jobs/${currentBrowseExp}/browse?${params}`);
+    const response = await api(`/api/jobs/${currentBrowseJobId}/browse?${params}`);
     
     if (response.error) {
       throw new Error(response.error);
@@ -254,30 +251,22 @@ async function loadDirectory(path) {
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
         
-        const nameIcon = file.is_directory ? '📁' : '📄';
-        const nameClass = file.is_directory ? 'text-blue-600 hover:text-blue-800 cursor-pointer' : 'text-gray-900';
-        const escapedName = file.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
-        const nameClick = file.is_directory ? `onclick="navigateToDir('${escapedName}')"` : '';
-        
-        const downloadBtn = file.is_directory ? '' : 
-          `<button onclick="downloadFile('${escapedName}')" class="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs">Download</button>`;
+        const icon = file.is_directory ? '📁' : '📄';
+        const clickHandler = file.is_directory ? `onclick="loadDirectory('${path ? path + '/' : ''}${file.name}')"` : '';
+        const cursor = file.is_directory ? 'cursor-pointer' : '';
         
         row.innerHTML = `
-          <td class="px-4 py-2">
-            <span class="inline-flex items-center">
-              <span class="mr-2">${nameIcon}</span>
-              <span class="${nameClass}" ${nameClick}>${file.name}</span>
-            </span>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 ${cursor}" ${clickHandler}>
+            ${icon} ${file.name}
           </td>
-          <td class="px-4 py-2 text-sm text-gray-600">${file.is_directory ? '-' : file.size}</td>
-          <td class="px-4 py-2 text-sm text-gray-600">${file.date}</td>
-          <td class="px-4 py-2">${downloadBtn}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.size}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.date}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.permissions}</td>
         `;
         
         filesTable.appendChild(row);
       });
     }
-    
   } catch (error) {
     errorDiv.textContent = error.message;
     errorDiv.classList.remove('hidden');
@@ -309,7 +298,7 @@ async function downloadFile(fileName) {
     
     // Create a temporary link to trigger download
     const link = document.createElement('a');
-    link.href = `/api/jobs/${currentBrowseExp}/download?${params}`;
+    link.href = `/api/jobs/${currentBrowseJobId}/download?${params}`;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
@@ -324,7 +313,7 @@ function closeBrowseModal() {
   const modal = document.getElementById('browse-modal');
   modal.classList.add('hidden');
   modal.classList.remove('flex');
-  currentBrowseExp = '';
+  currentBrowseJobId = '';
   currentBrowsePath = '';
 }
 
@@ -364,7 +353,7 @@ function setButtonLoading(buttonId, isLoading, loadingText = 'Loading...') {
 // ---------------------------------------------------------------------------
 // Log monitoring
 // ---------------------------------------------------------------------------
-let ws=null;function monitorJob(jobId,expName){const modal=document.getElementById('log-modal');const title=document.getElementById('log-title');const content=document.getElementById('log-content');title.textContent=`Logs for ${expName} (${jobId})`;content.textContent='';modal.classList.remove('hidden');modal.classList.add('flex');const wsUrl=`${location.origin.replace(/^http/,'ws')}/ws/logs/${jobId}`;ws=new WebSocket(wsUrl);ws.onmessage=e=>{content.textContent+=e.data+'\n';content.scrollTop=content.scrollHeight;};ws.onclose=()=>console.log('ws closed');}
+let ws=null;function monitorJob(jobId){const modal=document.getElementById('log-modal');const title=document.getElementById('log-title');const content=document.getElementById('log-content');title.textContent=`Logs for Job ${jobId}`;content.textContent='';modal.classList.remove('hidden');modal.classList.add('flex');const wsUrl=`${location.origin.replace(/^http/,'ws')}/ws/logs/${jobId}`;ws=new WebSocket(wsUrl);ws.onmessage=e=>{content.textContent+=e.data+'\n';content.scrollTop=content.scrollHeight;};ws.onclose=()=>console.log('ws closed');}
 function closeLogModal(){document.getElementById('log-modal').classList.add('hidden');document.getElementById('log-modal').classList.remove('flex');if(ws){ws.close();ws=null;}}
 document.getElementById('close-modal').addEventListener('click',closeLogModal);
 

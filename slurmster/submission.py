@@ -164,7 +164,7 @@ def submit_all(
             for line in conn.stream_tail(posixpath.join(run_dir, "stdout.log"), from_start=False, lines=50):
                 print(line, flush=True)
         except KeyboardInterrupt:
-            print("stopped monitoring (Ctrl-C). You can re-attach later with 'slurmster monitor --exp ...'")
+            print("stopped monitoring (Ctrl-C). You can re-attach later with 'slurmster monitor --job <job_id>'")
 
     return True
 

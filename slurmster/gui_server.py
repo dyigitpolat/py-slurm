@@ -171,22 +171,22 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
         finally:
             conn.close()
 
-    @app.get("/api/jobs/{exp_name}/browse")
-    def api_browse_job_directory(exp_name: str, path: str = ""):
+    @app.get("/api/jobs/{job_id}/browse")
+    def api_browse_job_directory(job_id: str, path: str = ""):
         """Browse files in a job's run directory."""
         conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
         try:
             from .registry import Registry
             remote_dir = _resolve_remote_path(conn, cfg["remote"]["base_dir"])
             reg = Registry(ssh_user, ssh_host, remote_dir, cfg.get("_local_root"))
-            run = reg.find_run(exp_name=exp_name)
+            run = reg.find_run(job_id=job_id)
             
             if not run:
-                return {"error": f"No run found for experiment {exp_name}"}
+                return {"error": f"No run found for job_id {job_id}"}
             
             run_dir = run.get("run_dir")
             if not run_dir:
-                return {"error": f"No run directory found for {exp_name}"}
+                return {"error": f"No run directory found for job_id {job_id}"}
             
             # Construct full path
             browse_path = run_dir
@@ -231,7 +231,8 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
                     })
                 
                 return {
-                    "exp_name": exp_name,
+                    "job_id": job_id,
+                    "exp_name": run.get("exp_name"),  # Keep for display purposes
                     "current_path": path,
                     "run_dir": run_dir,
                     "files": files
@@ -243,8 +244,8 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
         finally:
             conn.close()
 
-    @app.get("/api/jobs/{exp_name}/download")
-    def api_download_file(exp_name: str, file_path: str):
+    @app.get("/api/jobs/{job_id}/download")
+    def api_download_file(job_id: str, file_path: str):
         """Download a specific file from a job's run directory."""
         conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
         try:
@@ -256,37 +257,41 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
             
             remote_dir = _resolve_remote_path(conn, cfg["remote"]["base_dir"])
             reg = Registry(ssh_user, ssh_host, remote_dir, cfg.get("_local_root"))
-            run = reg.find_run(exp_name=exp_name)
+            run = reg.find_run(job_id=job_id)
             
             if not run:
-                raise ValueError(f"No run found for experiment {exp_name}")
+                raise ValueError(f"No run found for job_id {job_id}")
             
             run_dir = run.get("run_dir")
             if not run_dir:
-                raise ValueError(f"No run directory found for {exp_name}")
+                raise ValueError(f"No run directory found for job_id {job_id}")
             
             # Construct full remote file path using posixpath for remote paths
             remote_file_path = posixpath.join(run_dir, file_path.lstrip('/'))
             
-            # Create temporary file
-            temp_dir = tempfile.mkdtemp()
-            local_file_path = os.path.join(temp_dir, os.path.basename(file_path))
+            # Create a temporary local file
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                temp_path = temp_file.name
             
-            # Download file
-            conn.get_file(remote_file_path, local_file_path)
-            
-            # Verify file was downloaded
-            if not os.path.exists(local_file_path):
-                raise ValueError(f"Failed to download file: {file_path}")
-            
-            return FileResponse(
-                path=local_file_path,
-                filename=os.path.basename(file_path),
-                media_type='application/octet-stream'
-            )
-            
-        except Exception as e:
-            return {"error": f"Failed to download file: {str(e)}"}
+            try:
+                # Download the file to the temporary location
+                conn.get_file(remote_file_path, temp_path)
+                
+                # Get the filename for the response
+                filename = os.path.basename(file_path)
+                
+                # Return the file as a download
+                return FileResponse(
+                    temp_path,
+                    filename=filename,
+                    media_type='application/octet-stream'
+                )
+            except Exception as e:
+                # Clean up temp file if download failed
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                raise ValueError(f"Failed to download file: {str(e)}")
+                
         finally:
             conn.close()
 

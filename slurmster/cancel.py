@@ -6,11 +6,14 @@ from .registry import Registry
 from .remote_utils import _resolve_remote_path, _run_state_from_markers, _squeue_state
 
 
-def cancel(conn: SSHConnection, cfg, exp_name=None, job_id=None):
+def cancel(conn: SSHConnection, cfg, job_id=None):
     """Cancel a running Slurm job and update local registry."""
+    if not job_id:
+        raise ValueError("job_id is required for canceling")
+        
     remote_dir = _resolve_remote_path(conn, cfg["remote"]["base_dir"])
     reg = Registry(conn.user, conn.host, remote_dir, cfg.get('_local_root'))
-    run = reg.find_run(exp_name=exp_name, job_id=job_id)
+    run = reg.find_run(job_id=job_id)
     if not run:
         raise SystemExit("No matching run in registry")
     jid = run["job_id"]

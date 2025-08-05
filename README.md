@@ -39,8 +39,7 @@ slurmster --config config.yaml --user myuser --host myhost submit
 
 **Monitor logs:**
 ```bash
-slurmster --config config.yaml --user myuser --host myhost monitor --exp exp_lr_0.01_epochs_5
-# or by job ID:
+# Monitor by job ID:
 slurmster --config config.yaml --user myuser --host myhost monitor --job 1234567
 ```
 
@@ -51,12 +50,16 @@ slurmster --config config.yaml --user myuser --host myhost status
 
 **Fetch completed runs:**
 ```bash
+# Fetch all completed runs:
 slurmster --config config.yaml --user myuser --host myhost fetch
+# Or fetch a specific job:
+slurmster --config config.yaml --user myuser --host myhost fetch --job 1234567
 ```
 
 **Cancel jobs:**
 ```bash
-slurmster --config config.yaml --user myuser --host myhost cancel --exp exp_lr_0.01_epochs_5
+# Cancel specific job:
+slurmster --config config.yaml --user myuser --host myhost cancel --job 1234567
 # or cancel all:
 slurmster --config config.yaml --user myuser --host myhost cancel --all
 ```
@@ -78,7 +81,7 @@ For status:
 - `--all`: Show all runs (default: only non-fetched)
 
 For fetch:
-- `--exp <name>`: Only fetch a specific experiment
+- `--job <job_id>`: Only fetch a specific job by ID
 
 ## Configuration File
 

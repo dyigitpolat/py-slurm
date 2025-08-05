@@ -33,9 +33,7 @@ def main():
     p_submit.add_argument("--no-monitor", action="store_true", help="Do not auto-stream logs after submit")
 
     p_monitor = sub.add_parser("monitor", help="Stream logs for a single run")
-    g = p_monitor.add_mutually_exclusive_group(required=True)
-    g.add_argument("--exp", help="Experiment name to follow")
-    g.add_argument("--job", help="Job ID to follow")
+    p_monitor.add_argument("--job", required=True, help="Job ID to follow")
     p_monitor.add_argument("--from-start", action="store_true", help="Stream from beginning (default: last 100 lines)")
     p_monitor.add_argument("--lines", type=int, default=100, help="Number of trailing lines when attaching (default 100)")
 
@@ -43,11 +41,11 @@ def main():
     p_status.add_argument("--all", action="store_true", help="Show all runs (default: only non-fetched)")
 
     p_fetch = sub.add_parser("fetch", help="Fetch finished runs to local workspace")
-    p_fetch.add_argument("--exp", help="Only fetch a single experiment by name")
+    p_fetch.add_argument("--job", help="Only fetch a single job by ID")
+    p_fetch.add_argument("--all", action="store_true", help="Fetch all finished jobs (default behavior)")
 
     p_cancel = sub.add_parser("cancel", help="Cancel jobs")
     g2 = p_cancel.add_mutually_exclusive_group(required=True)
-    g2.add_argument("--exp", help="Cancel a single experiment by name")
     g2.add_argument("--job", help="Cancel a single job by ID")
     g2.add_argument("--all", action="store_true", help="Cancel all jobs tracked in this base directory")
 
@@ -129,16 +127,19 @@ def main():
                 dependency_job_id=dep_job_id,
             )
         elif args.cmd == "monitor":
-            monitor(conn, cfg, exp_name=args.exp, job_id=args.job, from_start=args.from_start, lines=args.lines)
+            monitor(conn, cfg, job_id=args.job, from_start=args.from_start, lines=args.lines)
         elif args.cmd == "status":
             status(conn, cfg, only_unfetched=(not args.all))
         elif args.cmd == "fetch":
-            fetch(conn, cfg, exp_name=args.exp)
+            if args.job:
+                fetch(conn, cfg, job_id=args.job)
+            else:
+                fetch(conn, cfg)  # fetch all by default
         elif args.cmd == "cancel":
             if getattr(args, "all", False):
                 cancel_all(conn, cfg)
             else:
-                cancel(conn, cfg, exp_name=args.exp, job_id=args.job)
+                cancel(conn, cfg, job_id=args.job)
     finally:
         if args.cmd != "gui":
             conn.close()
