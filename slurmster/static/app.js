@@ -454,6 +454,10 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
         ${createTextarea('slurm-directives', fullCfg.slurm?.directives || '', '#SBATCH --job-name={base_dir}\\n#SBATCH --partition=gpu\\n#SBATCH --time=00:10:00', 6)}
       </div>
       <div>
+        <label class="text-sm font-medium text-gray-700">Environment Setup Script</label>
+        ${createTextarea('env-setup', cfg.env_setup || '', 'env_setup.sh (optional)', 1)}
+      </div>
+      <div>
         <label class="text-sm font-medium text-gray-700">Run Command</label>
         ${createTextarea('run-command', cfg.command || '', 'source venv/bin/activate\\npython train.py --lr {lr}', 4)}
       </div>
@@ -604,6 +608,7 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
 }
 async function saveFullConfig(keys) {
   const runCmd = document.getElementById('run-command').value;
+  const envSetup = document.getElementById('env-setup').value.trim();
   const baseDir = document.getElementById('base-dir').value.trim();
   const filesPush = document.getElementById('files-push').value.split(',').map(s=>s.trim()).filter(Boolean);
   const filesFetch = document.getElementById('files-fetch').value.split(',').map(s=>s.trim()).filter(Boolean);
@@ -615,8 +620,13 @@ async function saveFullConfig(keys) {
     if(v.length) grid[k] = v;
   });
   
+  const runConfig = { command: runCmd, grid };
+  if (envSetup) {
+    runConfig.env_setup = envSetup;
+  }
+  
   const fullConfig = {
-    run: { command: runCmd, grid },
+    run: runConfig,
     remote: { base_dir: baseDir },
     files: { push: filesPush, fetch: filesFetch },
     slurm: { directives: slurmDirectives }

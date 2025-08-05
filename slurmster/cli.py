@@ -105,15 +105,13 @@ def main():
                 bind_port=args.gui_port,
             )
         elif args.cmd == "submit":
-            # Automatically locate env_setup.sh in the same directory as the YAML config (if present)
-            config_dir = os.path.dirname(os.path.abspath(args.config))
-            env_script = os.path.join(config_dir, "env_setup.sh")
-            if os.path.exists(env_script):
-                env_script_path = env_script
-            else:
-                # Fall back to the script bundled with the package (slurmster/env_setup.sh)
-                bundled_script = os.path.join(os.path.dirname(__file__), "env_setup.sh")
-                env_script_path = bundled_script if os.path.exists(bundled_script) else None
+            # Get env_setup script path from config
+            env_script_path = cfg["run"].get("env_setup")
+            if env_script_path and not os.path.isabs(env_script_path):
+                # If relative path, resolve relative to config file directory
+                config_dir = os.path.dirname(os.path.abspath(args.config))
+                env_script_path = os.path.join(config_dir, env_script_path)
+            
             _venv_dir, dep_job_id = setup_remote_env(conn, cfg, env_script_path=env_script_path)
             if dep_job_id:
                 from .core import wait_for_job

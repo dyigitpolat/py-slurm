@@ -27,6 +27,10 @@ def load_config(path):
         raise ValueError("config.run must provide either 'grid' or 'experiments'")
     if "command" not in cfg["run"]:
         raise ValueError("config.run.command is required")
+    
+    # env_setup is optional - if not specified, no environment setup will be performed
+    cfg["run"].setdefault("env_setup", None)
+    
     return cfg
 
 

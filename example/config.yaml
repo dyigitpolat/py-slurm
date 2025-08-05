@@ -20,6 +20,7 @@ slurm:
     #SBATCH --mem=16G
 
 run:
+  env_setup: env_setup.sh          # optional; path to environment setup script
   command: |
     source venv/bin/activate
     python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth" --log_file "{run_dir}/log.txt"
