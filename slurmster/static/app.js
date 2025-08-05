@@ -349,16 +349,31 @@ function closeBrowseModal() {
 // ---------------------------------------------------------------------------
 function showJobsLoading() {
   const tbody = document.getElementById('jobs-tbody');
-  tbody.innerHTML = '<tr><td colspan="100%" class="px-6 py-8 text-center text-gray-500"><div class="flex items-center justify-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Loading jobs...</div></td></tr>';
+  const statusIndicator = document.getElementById('status-indicator');
+  tbody.innerHTML = '<tr><td colspan="100%" class="px-6 py-8 text-center text-gray-500"><div class="flex items-center justify-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Running status check...</div></td></tr>';
+  if (statusIndicator) {
+    statusIndicator.classList.remove('hidden');
+    statusIndicator.classList.add('flex');
+  }
 }
 
 function hideJobsLoading() {
   // This will be handled by renderJobs() which replaces the tbody content
+  const statusIndicator = document.getElementById('status-indicator');
+  if (statusIndicator) {
+    statusIndicator.classList.add('hidden');
+    statusIndicator.classList.remove('flex');
+  }
 }
 
 function showJobsError(message) {
   const tbody = document.getElementById('jobs-tbody');
+  const statusIndicator = document.getElementById('status-indicator');
   tbody.innerHTML = `<tr><td colspan="100%" class="px-6 py-8 text-center text-red-500">Error loading jobs: ${message}</td></tr>`;
+  if (statusIndicator) {
+    statusIndicator.classList.add('hidden');
+    statusIndicator.classList.remove('flex');
+  }
 }
 
 function setButtonLoading(buttonId, isLoading, loadingText = 'Loading...') {
@@ -503,6 +518,8 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
   bulkPanel.innerHTML=`
     <h3 class="text-lg font-semibold mb-3">📦 Bulk Actions</h3>
     <div class="space-y-2">
+      <button id="status-check" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">Run Status Check</button>
+      <p class="text-xs text-gray-600">Refresh job statuses by checking markers and slurm queue</p>
       <button id="fetch-all" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded">Fetch All Finished Jobs</button>
       <p class="text-xs text-gray-600">Downloads all completed job outputs to local workspace</p>
     </div>
@@ -603,6 +620,23 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
       setButtonLoading('grid-submit', false);
     }
   };
+  document.getElementById('status-check').onclick=async()=>{
+    setButtonLoading('status-check', true, 'Checking...');
+    const button = document.getElementById('status-check');
+    const originalClass = button.className;
+    try {
+      await refreshJobs(true); // Show loading indicator for manual status check
+      // Briefly show success state
+      button.className = button.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700');
+      button.textContent = '✓ Status Updated';
+      setTimeout(() => {
+        button.className = originalClass;
+        button.textContent = 'Run Status Check';
+      }, 2000);
+    } finally {
+      setButtonLoading('status-check', false);
+    }
+  };
   document.getElementById('fetch-all').onclick=fetchAllFinished;
   updateHighlighters(keys);
 }
@@ -672,8 +706,11 @@ function setupHighlighter(areaId,taId,keys){const ta=document.getElementById(taI
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
-window.addEventListener('DOMContentLoaded',()=>{
+window.addEventListener('DOMContentLoaded',async()=>{
   buildConfigPanels();
-  refreshJobs(true); // Show loading on initial load
+  // Perform initial status check with loading indicator
+  console.log('🔍 Performing initial status check...');
+  await refreshJobs(true); // Show loading on initial load  
+  console.log('✅ Initial status check completed');
   setInterval(() => refreshJobs(false), 10000); // Don't show loading on periodic refreshes
 }); 
