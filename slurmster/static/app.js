@@ -1,10 +1,47 @@
 // slurmster dashboard front-end
 
+// Create a persistent HTTP agent for connection pooling and keep-alive
+// This solves the issue where each API call was creating a new TCP connection
+// with incrementing ephemeral ports (32768-65535 range)
+class HTTPClient {
+  constructor() {
+    // Configure fetch to use keep-alive connections
+    // keepalive: true enables connection reuse for multiple requests
+    // Connection: keep-alive tells the server to keep the connection open
+    // Keep-Alive header sets timeout and max requests per connection
+    this.defaultOptions = {
+      keepalive: true,
+      headers: {
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=30, max=100'
+      }
+    };
+  }
+
+  async request(path, opts = {}) {
+    // Merge default options with provided options
+    const mergedOpts = {
+      ...this.defaultOptions,
+      ...opts,
+      headers: {
+        ...this.defaultOptions.headers,
+        ...(opts.headers || {})
+      }
+    };
+
+    const res = await fetch(path, mergedOpts);
+    if (!res.ok) throw new Error(await res.text());
+    if (res.status === 204) return null;
+    return res.json();
+  }
+}
+
+// Create a singleton HTTP client instance
+const httpClient = new HTTPClient();
+
+// Updated api function that uses the HTTP client with connection pooling
 async function api(path, opts = {}) {
-  const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(await res.text());
-  if (res.status === 204) return null;
-  return res.json();
+  return httpClient.request(path, opts);
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +146,24 @@ function renderJobs(){
   const jobs=[...cachedJobs].sort(compareJobs);
   const tbody=document.getElementById('jobs-tbody');
   tbody.innerHTML='';
+  
+  if (jobs.length === 0) {
+    // Show helpful message when no jobs are found
+    const tr = document.createElement('tr');
+    const colCount = 3 + paramKeys.length; // job_id + state + params + actions
+    tr.innerHTML = `<td colspan="${colCount}" class="px-6 py-8 text-center text-gray-500">
+      <div class="flex flex-col items-center space-y-2">
+        <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+        </svg>
+        <p class="text-sm">No jobs found</p>
+        <p class="text-xs">Try running "Run Status Check" to discover jobs from the remote system</p>
+      </div>
+    </td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+  
   jobs.forEach(j=>{
     const tr=document.createElement('tr');
     const cells=[];
@@ -621,18 +676,36 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
     }
   };
   document.getElementById('status-check').onclick=async()=>{
-    setButtonLoading('status-check', true, 'Checking...');
+    setButtonLoading('status-check', true, 'Syncing with remote...');
     const button = document.getElementById('status-check');
     const originalClass = button.className;
     try {
-      await refreshJobs(true); // Show loading indicator for manual status check
-      // Briefly show success state
+      // Use the comprehensive status sync endpoint
+      const response = await api('/api/jobs/status-sync', {method: 'POST'});
+      
+      // Update the cached jobs with the synced data
+      if (response.jobs) {
+        cachedJobs = response.jobs;
+        paramKeysGlobal = computeParamKeys(response.jobs);
+        renderJobs();
+      }
+      
+      // Briefly show success state with job count
       button.className = button.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700');
-      button.textContent = '✓ Status Updated';
+      button.textContent = `✓ Found ${response.jobs_found || 0} jobs`;
       setTimeout(() => {
         button.className = originalClass;
         button.textContent = 'Run Status Check';
-      }, 2000);
+      }, 3000);
+    } catch (error) {
+      // Show error state
+      button.className = button.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-red-600 hover:bg-red-700');
+      button.textContent = '✗ Sync Failed';
+      setTimeout(() => {
+        button.className = originalClass;
+        button.textContent = 'Run Status Check';
+      }, 3000);
+      console.error('Status sync failed:', error);
     } finally {
       setButtonLoading('status-check', false);
     }

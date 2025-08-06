@@ -32,8 +32,8 @@ def _open_conn(host: str, user: str, port: int, password: Optional[str] = None, 
 def _list_jobs(conn: SSHConnection, cfg) -> list[Dict[str, Any]]:
     """Return a list of tracked runs augmented with their latest state.
 
-    This re-implements parts of slurmster.run_status.status but returns a JSON
-    serialisable structure instead of printing tables.
+    This function performs a lightweight status update for existing jobs
+    without the full discovery process (which is done by status-sync endpoint).
     """
     remote_dir = _resolve_remote_path(conn, cfg["remote"]["base_dir"])
     reg = Registry(conn.user, conn.host, remote_dir, cfg.get("_local_root"))
@@ -204,6 +204,27 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
             from .fetch import fetch
             fetch(conn, cfg)  # No exp_name means fetch all
             return {"detail": "fetched all finished jobs"}
+        finally:
+            conn.close()
+
+    @app.post("/api/jobs/status-sync")
+    def api_status_sync():
+        """Perform comprehensive status synchronization with remote system.
+        
+        This discovers new jobs, updates status for all jobs, and synchronizes
+        the local registry with the remote system state.
+        """
+        conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
+        try:
+            from .status_sync import sync_status_comprehensive
+            all_jobs = sync_status_comprehensive(conn, cfg)
+            # Sort by job id (numeric) descending so newest first
+            all_jobs.sort(key=lambda j: int(j.get("job_id") or 0), reverse=True)
+            return {
+                "detail": "status synchronization completed", 
+                "jobs_found": len(all_jobs),
+                "jobs": all_jobs
+            }
         finally:
             conn.close()
 
