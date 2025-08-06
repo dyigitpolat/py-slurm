@@ -29,12 +29,22 @@ if [ -d "{venv_dir}" ]; then
 fi
 
 # Execute user's command, tee stdout/stderr to file, preserve exit code
+set +e  # Temporarily disable exit-on-error to ensure cleanup always runs
 ( {run_cmd} ) 2>&1 | tee -a "$LOG_FILE"
 exit_code=${{PIPESTATUS[0]}}
+set -e  # Re-enable exit-on-error
 
+# Always perform cleanup regardless of command success/failure
 rm -f "$RUN_DIR/.running"
- touch "$RUN_DIR/.finished"
 echo $exit_code > "$RUN_DIR/.exitcode"
+
+# Mark job as finished or cancelled based on exit code
+if [ $exit_code -eq 0 ]; then
+    touch "$RUN_DIR/.finished"
+else
+    touch "$RUN_DIR/.cancelled"
+fi
+
 exit $exit_code
 """
 

@@ -676,9 +676,12 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
     }
   };
   document.getElementById('status-check').onclick=async()=>{
-    setButtonLoading('status-check', true, 'Syncing with remote...');
     const button = document.getElementById('status-check');
     const originalClass = button.className;
+    const originalText = 'Run Status Check';
+    
+    setButtonLoading('status-check', true, 'Syncing with remote...');
+    
     try {
       // Use the comprehensive status sync endpoint
       const response = await api('/api/jobs/status-sync', {method: 'POST'});
@@ -690,25 +693,40 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
         renderJobs();
       }
       
-      // Briefly show success state with job count
+      // First disable loading state
+      setButtonLoading('status-check', false);
+      
+      // Then show success state with job count
       button.className = button.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-green-600 hover:bg-green-700');
       button.textContent = `✓ Found ${response.jobs_found || 0} jobs`;
+      button.disabled = false; // Ensure button is enabled
+      
+      // Restore original state after delay
       setTimeout(() => {
         button.className = originalClass;
-        button.textContent = 'Run Status Check';
+        button.textContent = originalText;
+        button.disabled = false;
       }, 3000);
+      
     } catch (error) {
-      // Show error state
+      // First disable loading state
+      setButtonLoading('status-check', false);
+      
+      // Then show error state
       button.className = button.className.replace('bg-blue-600 hover:bg-blue-700', 'bg-red-600 hover:bg-red-700');
       button.textContent = '✗ Sync Failed';
+      button.disabled = false; // Ensure button is enabled
+      
+      // Restore original state after delay
       setTimeout(() => {
         button.className = originalClass;
-        button.textContent = 'Run Status Check';
+        button.textContent = originalText;
+        button.disabled = false;
       }, 3000);
+      
       console.error('Status sync failed:', error);
-    } finally {
-      setButtonLoading('status-check', false);
     }
+    // No finally block needed since we handle setButtonLoading in try/catch
   };
   document.getElementById('fetch-all').onclick=fetchAllFinished;
   updateHighlighters(keys);
