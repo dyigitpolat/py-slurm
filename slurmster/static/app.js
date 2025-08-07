@@ -287,7 +287,9 @@ async function browseJob(jobId) {
   currentBrowseJobId = jobId;
   
   // Show browse modal  
-  document.getElementById('browse-modal').classList.remove('hidden');
+  const modal = document.getElementById('browse-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
   
   // Load root directory
   await loadDirectory('');
@@ -337,13 +339,23 @@ async function loadDirectory(path) {
         const clickHandler = file.is_directory ? `onclick="loadDirectory('${path ? path + '/' : ''}${file.name}')"` : '';
         const cursor = file.is_directory ? 'cursor-pointer' : '';
         
+        // Action buttons for files (not directories)
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        const canView = isTextFile(fileExt) || isImageFile(fileExt) || isSvgFile(fileExt);
+        const viewButton = canView ? `<button onclick="viewFile('${file.name}')" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs mr-1">👁️ View</button>` : '';
+        
+        const actions = file.is_directory ? '' : `
+          ${viewButton}
+          <button onclick="downloadFile('${file.name}')" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">📥 Download</button>
+        `;
+        
         row.innerHTML = `
           <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 ${cursor}" ${clickHandler}>
             ${icon} ${file.name}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.size}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.date}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${file.permissions}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${actions}</td>
         `;
         
         filesTable.appendChild(row);
@@ -389,6 +401,161 @@ async function downloadFile(fileName) {
   } catch (error) {
     alert(`Failed to download ${fileName}: ${error.message}`);
   }
+}
+
+async function viewFile(fileName) {
+  try {
+    const filePath = currentBrowsePath ? `${currentBrowsePath}/${fileName}` : fileName;
+    const fileExt = fileName.split('.').pop().toLowerCase();
+    
+    // Show file viewer modal
+    const modal = document.getElementById('file-viewer-modal');
+    const title = document.getElementById('file-viewer-title');
+    const pathDisplay = document.getElementById('file-viewer-path');
+    const content = document.getElementById('file-content');
+    const downloadBtn = document.getElementById('download-file');
+    
+    title.textContent = fileName;
+    pathDisplay.textContent = filePath;
+    
+    // Set up download button
+    downloadBtn.onclick = () => downloadFile(fileName);
+    
+    modal.classList.remove('hidden');
+    
+    // Show loading state
+    content.innerHTML = '<div class="flex items-center justify-center h-64"><div class="text-gray-500">Loading...</div></div>';
+    
+    // Fetch file content
+    const params = new URLSearchParams();
+    params.append('file_path', filePath);
+    
+    if (isTextFile(fileExt)) {
+      // Load as text
+      const response = await fetch(`/api/jobs/${currentBrowseJobId}/download?${params}`);
+      const text = await response.text();
+      
+      content.innerHTML = `<pre class="bg-gray-100 p-4 rounded text-sm overflow-auto whitespace-pre-wrap">${escapeHtml(text)}</pre>`;
+    } else if (isImageFile(fileExt)) {
+      // Load as raster image
+      const imageUrl = `/api/jobs/${currentBrowseJobId}/download?${params}`;
+      content.innerHTML = `<div class="flex justify-center"><img src="${imageUrl}" alt="${fileName}" class="max-w-full max-h-full object-contain"/></div>`;
+    } else if (isSvgFile(fileExt)) {
+      // Load SVG with proper handling
+      try {
+        const response = await fetch(`/api/jobs/${currentBrowseJobId}/download?${params}`);
+        const svgText = await response.text();
+        
+        // Clean and ensure proper SVG structure
+        let cleanSvg = svgText.trim();
+        if (!cleanSvg.startsWith('<svg')) {
+          throw new Error('Invalid SVG format');
+        }
+        
+        // Wrap in a container with proper sizing
+        content.innerHTML = `
+          <div class="flex justify-center items-center w-full h-full">
+            <div class="max-w-full max-h-full" style="max-width: 90%; max-height: 90%;">
+              ${cleanSvg}
+            </div>
+          </div>
+        `;
+        
+        // Apply some basic styling to the SVG if it doesn't have explicit dimensions
+        const svgElement = content.querySelector('svg');
+        if (svgElement && !svgElement.style.width && !svgElement.style.height) {
+          svgElement.style.maxWidth = '100%';
+          svgElement.style.maxHeight = '100%';
+          svgElement.style.height = 'auto';
+        }
+      } catch (error) {
+        // Fallback to image approach if SVG parsing fails
+        const imageUrl = `/api/jobs/${currentBrowseJobId}/download?${params}`;
+        content.innerHTML = `<div class="flex justify-center"><img src="${imageUrl}" alt="${fileName}" class="max-w-full max-h-full object-contain"/></div>`;
+      }
+    } else {
+      // Unsupported file type
+      content.innerHTML = `
+        <div class="text-center py-8">
+          <p class="text-gray-500 mb-4">File type ".${fileExt}" not supported for preview</p>
+          <p class="text-sm text-gray-400 mb-2"><strong>Text files:</strong> Programming (py, js, ts, java, c, cpp, etc.), Documentation (md, txt, rst), Config (json, yaml, ini, etc.), Logs, Scripts</p>
+          <p class="text-sm text-gray-400"><strong>Images:</strong> png, jpg, jpeg, gif, webp, bmp, ico, svg</p>
+          <p class="text-xs text-gray-400 mt-2">Download the file to view it locally</p>
+        </div>
+      `;
+    }
+    
+  } catch (error) {
+    const content = document.getElementById('file-content');
+    content.innerHTML = `<div class="text-center py-8 text-red-500">Failed to load file: ${error.message}</div>`;
+  }
+}
+
+function isTextFile(ext) {
+  const textExtensions = [
+    // Programming languages
+    'py', 'js', 'ts', 'jsx', 'tsx', 'java', 'c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'clj', 'hs', 'ml', 'fs', 'pas', 'pl', 'r', 'jl', 'dart', 'lua', 'nim', 'zig', 'v',
+    
+    // Web technologies
+    'html', 'htm', 'css', 'scss', 'sass', 'less', 'xml', 'vue', 'svelte',
+    
+    // Data formats
+    'json', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'properties', 'env', 'csv', 'tsv', 'psv',
+    
+    // Documentation
+    'md', 'markdown', 'txt', 'rst', 'asciidoc', 'adoc', 'tex', 'latex', 'rtf',
+    
+    // Shell scripts
+    'sh', 'bash', 'zsh', 'fish', 'ps1', 'bat', 'cmd',
+    
+    // Build/config files
+    'makefile', 'dockerfile', 'jenkinsfile', 'vagrantfile', 'cmake', 'ninja', 'gradle', 'ant', 'maven', 'sbt', 'bazel',
+    
+    // Logs and outputs
+    'log', 'out', 'err', 'stdout', 'stderr', 'trace', 'debug',
+    
+    // Database
+    'sql', 'sqlite', 'mysql', 'pgsql', 'plsql',
+    
+    // Scientific/Data
+    'ipynb', 'rmd', 'qmd', 'npy', 'npz', 'mat', 'hdf5', 'h5', 'nc', 'cdf',
+    
+    // License/Readme files
+    'license', 'readme', 'changelog', 'authors', 'contributors', 'copying', 'install', 'news', 'todo',
+    
+    // Misc text formats
+    'diff', 'patch', 'gitignore', 'gitattributes', 'editorconfig', 'eslintrc', 'prettierrc', 'babelrc', 'vimrc', 'bashrc', 'zshrc', 'profile',
+    
+    // Certificate/Key files (text-based)
+    'pem', 'crt', 'cert', 'key', 'pub', 'asc', 'sig',
+    
+    // Other common text files
+    'mf', 'manifest', 'spec', 'requirements', 'gemfile', 'podfile', 'brewfile', 'procfile'
+  ];
+  return textExtensions.includes(ext);
+}
+
+function isImageFile(ext) {
+  const imageExtensions = [
+    // Browser-supported raster formats
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico'
+  ];
+  return imageExtensions.includes(ext);
+}
+
+function isSvgFile(ext) {
+  return ext === 'svg';
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function closeFileViewer() {
+  const modal = document.getElementById('file-viewer-modal');
+  modal.classList.add('hidden');
 }
 
 function closeBrowseModal() {
@@ -503,6 +670,9 @@ document.getElementById('close-modal').addEventListener('click',closeLogModal);
 document.getElementById('close-browse-modal').addEventListener('click',closeBrowseModal);
 document.getElementById('browse-up').addEventListener('click',navigateUp);
 document.getElementById('browse-refresh').addEventListener('click',()=>loadDirectory(currentBrowsePath));
+
+// File viewer modal event listener
+document.getElementById('close-file-viewer').addEventListener('click',closeFileViewer);
 
 // ---------------------------------------------------------------------------
 // Config Panels

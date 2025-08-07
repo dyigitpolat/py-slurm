@@ -56,7 +56,7 @@
   </div>
 
   <!-- File browser modal -->
-  <div id="browse-modal" class="fixed inset-0 bg-black/50 items-center justify-center hidden">
+  <div id="browse-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden">
     <div class="bg-white rounded-lg w-full max-w-5xl p-4 flex flex-col max-h-[90vh]">
       <div class="flex justify-between items-center mb-4">
         <div>
@@ -95,6 +95,26 @@
         </div>
         <div id="browse-error" class="text-center py-8 text-red-500 hidden">
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- File viewer modal -->
+  <div id="file-viewer-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg w-full max-w-6xl p-4 flex flex-col max-h-[95vh]">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h2 id="file-viewer-title" class="text-lg font-semibold"></h2>
+          <p id="file-viewer-path" class="text-sm text-gray-600"></p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="download-file" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">📥 Download</button>
+          <button id="close-file-viewer" class="text-gray-600 hover:text-gray-800 text-xl">✖</button>
+        </div>
+      </div>
+      
+      <div class="flex-1 overflow-auto">
+        <div id="file-content" class="w-full h-full"></div>
       </div>
     </div>
   </div>
