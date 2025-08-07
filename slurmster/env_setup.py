@@ -35,13 +35,15 @@ def load_config(path):
     return cfg
 
 
-def setup_remote_env(conn: SSHConnection, cfg, env_script_path: Optional[str] = None):
-    """Prepare remote directories, upload source files, and **schedule** environment setup.
+def setup_remote_env(conn: SSHConnection, cfg, env_script_path: Optional[str] = None, stream_callback=None):
+    """Prepare remote directories, upload source files, and **run** environment setup.
 
-    Heavy-weight environment preparation (creating a virtualenv, installing deps) is
-    submitted to Slurm with *sbatch* so it runs on a compute node instead of the login
-    node.  The job is idempotent – the script itself checks whether the venv already
-    exists.
+    Environment preparation (creating a virtualenv, installing deps) is
+    executed directly on the login node. The script is idempotent – it checks 
+    whether the venv already exists.
+
+    Args:
+        stream_callback: Optional callback function to receive streaming output
 
     Returns
     -------
@@ -73,28 +75,53 @@ def setup_remote_env(conn: SSHConnection, cfg, env_script_path: Optional[str] = 
 
     env_job_id: Optional[str] = None
 
-    # Upload & **submit** env_setup.sh as its own Slurm job (optional)
+    # Upload & **run** env_setup.sh directly on login node (optional)
     if env_script_path and os.path.exists(env_script_path):
         remote_setup = posixpath.join(remote_dir, "env_setup.sh")
         conn.put_file(env_script_path, remote_setup)
         conn.bash(f"chmod +x {remote_setup}")
 
-        # Submit the environment preparation as a separate job so it runs on a
-        # compute node and we avoid blocking / spamming the login node.
-        rc, out, err = conn.bash(
-            "sbatch --job-name=env_setup "
-            f"--chdir={remote_dir} "
-            f"--output={remote_dir}/env_setup.out "
-            f"--error={remote_dir}/env_setup.err "
-            f"{remote_setup}"
-        )
+        # Run the environment preparation directly on the login node
+        if stream_callback:
+            # Stream output in real-time
+            cmd = f"cd {remote_dir} && {remote_setup} 2>&1 | tee {remote_dir}/env_setup.out"
+            rc = conn.run_with_streaming(cmd, stream_callback)
+        else:
+            # Run without streaming  
+            rc, out, err = conn.bash(
+                f"cd {remote_dir} && "
+                f"{remote_setup} > {remote_dir}/env_setup.out 2> {remote_dir}/env_setup.err"
+            )
+        
         if rc != 0:
-            raise RuntimeError(f"sbatch failed for env_setup.sh: {err or out}")
+            raise RuntimeError(f"env_setup.sh failed (exit code {rc})")
 
-        env_job_id = _parse_job_id(out)
-        print(f"submitted env_setup.sh as job {env_job_id}")
+        # Create marker file to indicate env setup completed successfully
+        marker_file = posixpath.join(remote_dir, ".slurmster_env_setup")
+        conn.bash(f"touch {marker_file}")
+        if stream_callback:
+            stream_callback("Environment setup completed successfully!")
+        else:
+            print(f"environment setup completed successfully")
 
     return venv_dir, env_job_id
 
 
-__all__ = ["load_config", "setup_remote_env"] 
+def check_env_setup_marker(conn: SSHConnection, cfg) -> bool:
+    """Check if environment setup marker file exists on remote."""
+    remote_dir = _resolve_remote_path(conn, cfg["remote"]["base_dir"])
+    marker_file = posixpath.join(remote_dir, ".slurmster_env_setup")
+    
+    rc, _, _ = conn.bash(f"test -f {marker_file}")
+    return rc == 0
+
+
+def check_remote_dir_exists(conn: SSHConnection, cfg) -> bool:
+    """Check if remote directory exists."""
+    remote_dir = _resolve_remote_path(conn, cfg["remote"]["base_dir"])
+    
+    rc, _, _ = conn.bash(f"test -d {remote_dir}")
+    return rc == 0
+
+
+__all__ = ["load_config", "setup_remote_env", "check_env_setup_marker", "check_remote_dir_exists"] 

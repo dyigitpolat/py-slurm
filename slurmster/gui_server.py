@@ -110,37 +110,41 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
 
     @app.post("/api/jobs/submit")
     def api_submit_jobs():
-        """Submit all jobs defined in the YAML config. Equivalent to the CLI
-        `slurmster submit` command with `--no-monitor`.
-        """
+        """Submit all jobs defined in the YAML config without environment setup."""
         conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
         try:
-            # Handle env_setup like the CLI does
+            submit_all(conn, cfg, user=ssh_user, host=ssh_host, monitor=False, dependency_job_id=None)
+            return {"detail": "submitted"}
+        finally:
+            conn.close()
+
+    @app.post("/api/jobs/submit_env_setup")
+    def api_submit_jobs_env_setup():
+        """Submit all jobs defined in the YAML config after setting up environment."""
+        conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
+        try:
+            # Always run env_setup when using this endpoint
             from .env_setup import setup_remote_env
             import os
             env_script_path = cfg["run"].get("env_setup")
             dep_job_id = None
             if env_script_path:
                 # Resolve relative paths relative to the config file directory
-                # The _local_root is set to config_dir/.slurmster in CLI
                 if not os.path.isabs(env_script_path) and "_local_root" in cfg:
                     config_dir = os.path.dirname(cfg["_local_root"])  # Remove the /.slurmster part
                     env_script_path = os.path.join(config_dir, env_script_path)
                 elif not os.path.isabs(env_script_path):
                     env_script_path = os.path.abspath(env_script_path)
                 _venv_dir, dep_job_id = setup_remote_env(conn, cfg, env_script_path=env_script_path)
-                if dep_job_id:
-                    from .core import wait_for_job
-                    wait_for_job(conn, dep_job_id)
             
             submit_all(conn, cfg, user=ssh_user, host=ssh_host, monitor=False, dependency_job_id=dep_job_id)
-            return {"detail": "submitted"}
+            return {"detail": "submitted with env setup"}
         finally:
             conn.close()
 
     @app.post("/api/jobs/submit_single")
     def api_submit_single(params: dict):
-        """Submit a single job with the provided params dict (no grid)."""
+        """Submit a single job with the provided params dict (no grid) without environment setup."""
         if not isinstance(params, dict):
             raise ValueError("JSON body must be object with params")
         from copy import deepcopy
@@ -153,26 +157,80 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
 
         conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
         try:
-            # Handle env_setup like the CLI does
+            submit_all(conn, single_cfg, user=ssh_user, host=ssh_host, monitor=False, dependency_job_id=None)
+            return {"detail": "submitted single"}
+        finally:
+            conn.close()
+
+    @app.post("/api/jobs/submit_single_env_setup")
+    def api_submit_single_env_setup(params: dict):
+        """Submit a single job after setting up the environment first."""
+        if not isinstance(params, dict):
+            raise ValueError("JSON body must be object with params")
+        from copy import deepcopy
+
+        single_cfg = deepcopy(cfg)
+        run_section = single_cfg.setdefault("run", {})
+        run_section["experiments"] = [params]
+        # Remove grid if present to avoid Cartesian expansion
+        run_section.pop("grid", None)
+
+        conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
+        try:
+            # Always run env_setup when using this endpoint
             from .env_setup import setup_remote_env
             import os
             env_script_path = single_cfg["run"].get("env_setup")
             dep_job_id = None
             if env_script_path:
                 # Resolve relative paths relative to the config file directory
-                # The _local_root is set to config_dir/.slurmster in CLI
                 if not os.path.isabs(env_script_path) and "_local_root" in single_cfg:
                     config_dir = os.path.dirname(single_cfg["_local_root"])  # Remove the /.slurmster part
                     env_script_path = os.path.join(config_dir, env_script_path)
                 elif not os.path.isabs(env_script_path):
                     env_script_path = os.path.abspath(env_script_path)
                 _venv_dir, dep_job_id = setup_remote_env(conn, single_cfg, env_script_path=env_script_path)
-                if dep_job_id:
-                    from .core import wait_for_job
-                    wait_for_job(conn, dep_job_id)
             
             submit_all(conn, single_cfg, user=ssh_user, host=ssh_host, monitor=False, dependency_job_id=dep_job_id)
-            return {"detail": "submitted single"}
+            return {"detail": "submitted single with env setup"}
+        finally:
+            conn.close()
+
+    @app.get("/api/env/status")
+    def api_check_env_status():
+        """Check if remote directory exists and if env setup marker is present."""
+        conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
+        try:
+            from .env_setup import check_env_setup_marker, check_remote_dir_exists
+            
+            remote_dir_exists = check_remote_dir_exists(conn, cfg)
+            env_setup_marker_exists = check_env_setup_marker(conn, cfg) if remote_dir_exists else False
+            
+            return {
+                "remote_dir_exists": remote_dir_exists,
+                "env_setup_completed": env_setup_marker_exists
+            }
+        finally:
+            conn.close()
+
+    @app.post("/api/env/setup")
+    def api_env_setup():
+        """Run environment setup (same for both single and grid jobs)."""
+        conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
+        try:
+            from .env_setup import setup_remote_env
+            import os
+            env_script_path = cfg["run"].get("env_setup")
+            if env_script_path:
+                if not os.path.isabs(env_script_path) and "_local_root" in cfg:
+                    config_dir = os.path.dirname(cfg["_local_root"])
+                    env_script_path = os.path.join(config_dir, env_script_path)
+                elif not os.path.isabs(env_script_path):
+                    env_script_path = os.path.abspath(env_script_path)
+                _venv_dir, dep_job_id = setup_remote_env(conn, cfg, env_script_path=env_script_path)
+                return {"detail": "env setup completed"}
+            else:
+                return {"detail": "no env setup configured"}
         finally:
             conn.close()
 
@@ -433,6 +491,65 @@ def create_app(cfg, *, ssh_host: str, ssh_user: str, ssh_port: int = 22, passwor
                     asyncio.run_coroutine_threadsafe(websocket.send_text(f"[ERROR] {e}"), loop)
             try:
                 await anyio.to_thread.run_sync(_stream)
+            except WebSocketDisconnect:
+                pass
+        finally:
+            conn.close()
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+    @app.websocket("/ws/env_setup")
+    async def ws_env_setup(websocket: WebSocket):
+        """WebSocket endpoint for streaming environment setup output."""
+        await websocket.accept()
+        conn = _open_conn(ssh_host, ssh_user, ssh_port, password, key_filename)
+        try:
+            from .env_setup import setup_remote_env
+            import os, asyncio, anyio
+            
+            env_script_path = cfg["run"].get("env_setup")
+            if not env_script_path:
+                await websocket.send_text("No environment setup script configured")
+                await websocket.close()
+                return
+                
+            # Resolve relative paths
+            if not os.path.isabs(env_script_path) and "_local_root" in cfg:
+                config_dir = os.path.dirname(cfg["_local_root"])
+                env_script_path = os.path.join(config_dir, env_script_path)
+            elif not os.path.isabs(env_script_path):
+                env_script_path = os.path.abspath(env_script_path)
+                
+            if not os.path.exists(env_script_path):
+                await websocket.send_text(f"Environment setup script not found: {env_script_path}")
+                await websocket.close()
+                return
+            
+            loop = asyncio.get_running_loop()
+            
+            def stream_callback(line):
+                """Callback to send streaming output via websocket."""
+                try:
+                    if websocket.application_state == WebSocketState.CONNECTED:
+                        asyncio.run_coroutine_threadsafe(websocket.send_text(line), loop)
+                except Exception as e:
+                    print(f"Failed to send websocket message: {e}")
+            
+            def run_env_setup():
+                """Run environment setup with streaming."""
+                try:
+                    stream_callback("Starting environment setup...")
+                    _venv_dir, dep_job_id = setup_remote_env(conn, cfg, env_script_path=env_script_path, stream_callback=stream_callback)
+                    stream_callback("Environment setup completed successfully!")
+                    stream_callback("__ENV_SETUP_COMPLETE__")  # Special marker for frontend
+                except Exception as e:
+                    stream_callback(f"Environment setup failed: {str(e)}")
+                    stream_callback("__ENV_SETUP_ERROR__")  # Special error marker for frontend
+            
+            try:
+                await anyio.to_thread.run_sync(run_env_setup)
             except WebSocketDisconnect:
                 pass
         finally:

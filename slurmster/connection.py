@@ -99,6 +99,51 @@ class SSHConnection:
             except Exception:
                 pass
 
+    def run_with_streaming(self, command, stream_callback):
+        """Run a command and stream output via callback. Returns exit code."""
+        if not self._client:
+            raise RuntimeError("SSHConnection not connected")
+        
+        # Use shlex.quote for proper shell escaping
+        cmd = f'bash -lc {shlex.quote(command)}'
+        
+        transport = self._client.get_transport()
+        if transport is None:
+            raise RuntimeError("No transport")
+        
+        channel = transport.open_session()
+        channel.get_pty()
+        channel.exec_command(cmd)
+        
+        buff = b""
+        try:
+            while True:
+                if channel.recv_ready():
+                    chunk = channel.recv(4096)
+                    if not chunk:
+                        break
+                    buff += chunk
+                    while b"\n" in buff:
+                        line, buff = buff.split(b"\n", 1)
+                        line_str = line.decode("utf-8", "ignore")
+                        if line_str.strip():  # Only send non-empty lines
+                            stream_callback(line_str)
+                
+                if channel.exit_status_ready():
+                    if buff:
+                        line_str = buff.decode("utf-8", "ignore")
+                        if line_str.strip():
+                            stream_callback(line_str)
+                        buff = b""
+                    break
+                    
+            return channel.recv_exit_status()
+        finally:
+            try:
+                channel.close()
+            except Exception:
+                pass
+
     # ------------- SFTP helpers -------------
 
     def sftp(self):

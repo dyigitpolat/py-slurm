@@ -452,6 +452,51 @@ function setButtonLoading(buttonId, isLoading, loadingText = 'Loading...') {
 // ---------------------------------------------------------------------------
 let ws=null;function monitorJob(jobId){const modal=document.getElementById('log-modal');const title=document.getElementById('log-title');const content=document.getElementById('log-content');title.textContent=`Logs for Job ${jobId}`;content.textContent='';modal.classList.remove('hidden');modal.classList.add('flex');const wsUrl=`${location.origin.replace(/^http/,'ws')}/ws/logs/${jobId}`;ws=new WebSocket(wsUrl);ws.onmessage=e=>{content.textContent+=e.data+'\n';content.scrollTop=content.scrollHeight;};ws.onclose=()=>console.log('ws closed');}
 function closeLogModal(){document.getElementById('log-modal').classList.add('hidden');document.getElementById('log-modal').classList.remove('flex');if(ws){ws.close();ws=null;}}
+
+function monitorEnvSetup() {
+  const modal = document.getElementById('log-modal');
+  const title = document.getElementById('log-title');
+  const content = document.getElementById('log-content');
+  
+  title.textContent = 'Environment Setup';
+  content.textContent = '';
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  
+  const wsUrl = `${location.origin.replace(/^http/, 'ws')}/ws/env_setup`;
+  ws = new WebSocket(wsUrl);
+  
+  ws.onmessage = (e) => {
+    const line = e.data;
+    
+    // Check for special completion/error markers
+    if (line === '__ENV_SETUP_COMPLETE__') {
+      content.textContent += '\nEnvironment setup completed! Closing in 3 seconds...\n';
+      content.scrollTop = content.scrollHeight;
+      setTimeout(() => {
+        closeLogModal();
+        // Refresh environment status after completion
+        checkEnvironmentStatus();
+      }, 3000);
+      return;
+    }
+    
+    if (line === '__ENV_SETUP_ERROR__') {
+      content.textContent += '\nEnvironment setup failed. Please check the output above.\n';
+      content.scrollTop = content.scrollHeight;
+      return;
+    }
+    
+    content.textContent += line + '\n';
+    content.scrollTop = content.scrollHeight;
+  };
+  
+  ws.onclose = () => console.log('env setup ws closed');
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+    content.textContent += '\nWebSocket connection error. Please try again.\n';
+  };
+}
 document.getElementById('close-modal').addEventListener('click',closeLogModal);
 
 // Browse modal event listeners
@@ -503,7 +548,7 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
   area.appendChild(tutorial);
   
   // Configuration panel (left half)
-  const configPanel=document.createElement('div');configPanel.className='bg-white rounded shadow p-4';
+  const configPanel=document.createElement('div');configPanel.className='bg-white rounded-lg shadow-md border border-gray-200 p-5';
   configPanel.innerHTML=`
     <h3 class="text-lg font-semibold mb-3">🔧 Configuration</h3>
     <div class="space-y-4">
@@ -539,44 +584,54 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
   const jobContainer=document.createElement('div');jobContainer.className='space-y-4';
   
   // Single job submission panel
-  const singlePanel=document.createElement('div');singlePanel.className='bg-white rounded shadow p-4';
+  const singlePanel=document.createElement('div');singlePanel.className='bg-white rounded-lg shadow-md border border-gray-200 p-5';
   singlePanel.innerHTML=`
     <h3 class="text-lg font-semibold mb-3">🎯 Single Job Submission</h3>
     <div class="space-y-3">
       <div id="single-fields" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
       <div class="flex items-center space-x-2">
         <input id="single-new-param" placeholder="add new parameter" class="input-field flex-1"/>
-        <button id="single-add-param" class="px-3 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded text-sm">Add</button>
+        <button id="single-add-param" class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded text-sm font-medium">Add</button>
       </div>
-      <button id="single-submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded">Submit Single Job</button>
+      <div class="flex space-x-2">
+        <button id="single-submit" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:bg-gray-400 disabled:cursor-not-allowed font-medium">Submit</button>
+        <button id="single-submit-env" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium">🔧 Set Up Environment & Submit</button>
+      </div>
     </div>
   `;
   jobContainer.appendChild(singlePanel);
   
   // Grid job submission panel  
-  const gridPanel=document.createElement('div');gridPanel.className='bg-white rounded shadow p-4';
+  const gridPanel=document.createElement('div');gridPanel.className='bg-white rounded-lg shadow-md border border-gray-200 p-5';
   gridPanel.innerHTML=`
     <h3 class="text-lg font-semibold mb-3">🔥 Grid Job Submission</h3>
     <div class="space-y-3">
       <div id="grid-fields" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
       <div class="flex items-center space-x-2">
         <input id="grid-new-param" placeholder="add new parameter" class="input-field flex-1"/>
-        <button id="grid-add-param" class="px-3 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded text-sm">Add</button>
+        <button id="grid-add-param" class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded text-sm font-medium">Add</button>
       </div>
-      <button id="grid-submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded">Submit Grid Jobs</button>
+      <div class="flex space-x-2">
+        <button id="grid-submit" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:bg-gray-400 disabled:cursor-not-allowed font-medium">Submit</button>
+        <button id="grid-submit-env" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium">🔧 Set Up Environment & Submit</button>
+      </div>
     </div>
   `;
   jobContainer.appendChild(gridPanel);
 
   // Bulk actions panel
-  const bulkPanel=document.createElement('div');bulkPanel.className='bg-gray-50 rounded shadow p-4';
+  const bulkPanel=document.createElement('div');bulkPanel.className='bg-slate-50 rounded-lg shadow-md border border-slate-200 p-5';
   bulkPanel.innerHTML=`
     <h3 class="text-lg font-semibold mb-3">📦 Bulk Actions</h3>
-    <div class="space-y-2">
-      <button id="status-check" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">Run Status Check</button>
-      <p class="text-xs text-gray-600">Refresh job statuses by checking markers and slurm queue</p>
-      <button id="fetch-all" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded">Fetch All Finished Jobs</button>
-      <p class="text-xs text-gray-600">Downloads all completed job outputs to local workspace</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="space-y-2">
+        <button id="status-check" class="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium">🔄 Run Status Check</button>
+        <p class="text-xs text-gray-600">Refresh job statuses by checking markers and slurm queue</p>
+      </div>
+      <div class="space-y-2">
+        <button id="fetch-all" class="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium">📥 Fetch All Finished Jobs</button>
+        <p class="text-xs text-gray-600">Downloads all completed job outputs to local workspace</p>
+      </div>
     </div>
   `;
   jobContainer.appendChild(bulkPanel);
@@ -675,6 +730,75 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
       setButtonLoading('grid-submit', false);
     }
   };
+  document.getElementById('single-submit-env').onclick=async()=>{
+    setButtonLoading('single-submit-env', true, 'Setting up environment & submitting...');
+    try {
+      await saveFullConfig(keys);
+      
+      // Show environment setup monitor first
+      monitorEnvSetup();
+      
+      // Add delay to let monitor connect
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Wait for env setup to complete before submitting
+      await new Promise((resolve, reject) => {
+        const origOnMessage = ws.onmessage;
+        ws.onmessage = (e) => {
+          origOnMessage(e); // Call original handler
+          if (e.data === '__ENV_SETUP_COMPLETE__') {
+            resolve();
+          } else if (e.data === '__ENV_SETUP_ERROR__') {
+            reject(new Error('Environment setup failed'));
+          }
+        };
+      });
+      
+      // Now submit the job
+      const params={};keys.forEach(k=>{const v=document.getElementById(`single-${k}`).value.trim();if(v)params[k]=v;});
+      await api('/api/jobs/submit_single',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)});
+      await refreshJobs(false);
+      await checkEnvironmentStatus();
+    } catch (error) {
+      console.error('Environment setup & submit failed:', error);
+    } finally {
+      setButtonLoading('single-submit-env', false);
+    }
+  };
+  document.getElementById('grid-submit-env').onclick=async()=>{
+    setButtonLoading('grid-submit-env', true, 'Setting up environment & submitting...');
+    try {
+      await saveFullConfig(keys);
+      
+      // Show environment setup monitor first
+      monitorEnvSetup();
+      
+      // Add delay to let monitor connect
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Wait for env setup to complete before submitting
+      await new Promise((resolve, reject) => {
+        const origOnMessage = ws.onmessage;
+        ws.onmessage = (e) => {
+          origOnMessage(e); // Call original handler
+          if (e.data === '__ENV_SETUP_COMPLETE__') {
+            resolve();
+          } else if (e.data === '__ENV_SETUP_ERROR__') {
+            reject(new Error('Environment setup failed'));
+          }
+        };
+      });
+      
+      // Now submit the jobs
+      await api('/api/jobs/submit',{method:'POST'});
+      await refreshJobs(false);
+      await checkEnvironmentStatus();
+    } catch (error) {
+      console.error('Environment setup & submit failed:', error);
+    } finally {
+      setButtonLoading('grid-submit-env', false);
+    }
+  };
   document.getElementById('status-check').onclick=async()=>{
     const button = document.getElementById('status-check');
     const originalClass = button.className;
@@ -730,6 +854,9 @@ python train.py --lr {lr} --epochs {epochs} --save_model "{run_dir}/model.pth"
   };
   document.getElementById('fetch-all').onclick=fetchAllFinished;
   updateHighlighters(keys);
+  
+  // Check environment status to enable/disable submit buttons
+  checkEnvironmentStatus();
 }
 async function saveFullConfig(keys) {
   const runCmd = document.getElementById('run-command').value;
@@ -770,6 +897,52 @@ function updateHighlighters(keys) {
   setupHighlighter('slurm-directives-pre', 'slurm-directives', keys);
   setupHighlighter('env-setup-pre', 'env-setup', keys);
   setupHighlighter('run-command-pre', 'run-command', keys);
+}
+
+async function checkEnvironmentStatus() {
+  try {
+    const envStatus = await api('/api/env/status');
+    const singleSubmitBtn = document.getElementById('single-submit');
+    const gridSubmitBtn = document.getElementById('grid-submit');
+    
+    // Disable vanilla submit buttons if remote directory doesn't exist or no env setup marker
+    const shouldDisable = !envStatus.remote_dir_exists || !envStatus.env_setup_completed;
+    
+    if (singleSubmitBtn) {
+      singleSubmitBtn.disabled = shouldDisable;
+      if (shouldDisable) {
+        singleSubmitBtn.title = envStatus.remote_dir_exists 
+          ? 'Environment setup required before submitting' 
+          : 'Remote directory does not exist';
+      } else {
+        singleSubmitBtn.title = '';
+      }
+    }
+    
+    if (gridSubmitBtn) {
+      gridSubmitBtn.disabled = shouldDisable;
+      if (shouldDisable) {
+        gridSubmitBtn.title = envStatus.remote_dir_exists 
+          ? 'Environment setup required before submitting' 
+          : 'Remote directory does not exist';
+      } else {
+        gridSubmitBtn.title = '';
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to check environment status:', error);
+    // On error, disable the buttons as a safe default
+    const singleSubmitBtn = document.getElementById('single-submit');
+    const gridSubmitBtn = document.getElementById('grid-submit');
+    if (singleSubmitBtn) {
+      singleSubmitBtn.disabled = true;
+      singleSubmitBtn.title = 'Cannot check environment status';
+    }
+    if (gridSubmitBtn) {
+      gridSubmitBtn.disabled = true;
+      gridSubmitBtn.title = 'Cannot check environment status';
+    }
+  }
 }
 
 // escape html

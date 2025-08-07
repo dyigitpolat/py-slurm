@@ -1,5 +1,5 @@
 remote:
-  base_dir: mnist_test
+  base_dir: mnist_test_2
 
 files:
   push:
